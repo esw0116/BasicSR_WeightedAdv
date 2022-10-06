@@ -103,8 +103,8 @@ def parse_options(root_path, is_train=True):
     parser.add_argument('--auto_resume', action='store_true')
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--local_rank', type=int, default=0)
-    parser.add_argument(
-        '--force_yml', nargs='+', default=None, help='Force to update yml files. Examples: train:ema_decay=0.999')
+    parser.add_argument('--force_yml', nargs='+', default=None, help='Force to update yml files. Examples: train:ema_decay=0.999')
+    parser.add_argument('--use_nsml', action='store_true', help='Use nsml for training/testing')
     args = parser.parse_args()
 
     # parse yml to dict
@@ -158,6 +158,7 @@ def parse_options(root_path, is_train=True):
         # for multiple datasets, e.g., val_1, val_2; test_1, test_2
         phase = phase.split('_')[0]
         dataset['phase'] = phase
+        dataset['use_nsml'] = args.use_nsml
         if 'scale' in opt:
             dataset['scale'] = opt['scale']
         if dataset.get('dataroot_gt') is not None:

@@ -1,3 +1,8 @@
+#nsml: junsukchoe/backbone:cu92_torch171
+
+imageio
+ninja
+thop
 addict
 future
 lmdb
