@@ -88,6 +88,8 @@ class SRModel(BaseModel):
         self.lq = data['lq'].to(self.device)
         if 'gt' in data:
             self.gt = data['gt'].to(self.device)
+        if 'coeff' in data:
+            self.coeff = data['coeff'].to(self.device)
 
     def optimize_parameters(self, current_iter):
         self.optimizer_g.zero_grad()

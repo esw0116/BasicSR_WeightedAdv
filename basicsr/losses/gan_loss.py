@@ -20,15 +20,16 @@ class GANLoss(nn.Module):
             for discriminators.
     """
 
-    def __init__(self, gan_type, real_label_val=1.0, fake_label_val=0.0, loss_weight=1.0):
+    def __init__(self, gan_type, real_label_val=1.0, fake_label_val=0.0, loss_weight=1.0, var_weight=False):
         super(GANLoss, self).__init__()
         self.gan_type = gan_type
         self.loss_weight = loss_weight
         self.real_label_val = real_label_val
         self.fake_label_val = fake_label_val
+        self.var_weight = 'none' if var_weight else 'mean'
 
         if self.gan_type == 'vanilla':
-            self.loss = nn.BCEWithLogitsLoss()
+            self.loss = nn.BCEWithLogitsLoss(reduction=self.var_weight)
         elif self.gan_type == 'lsgan':
             self.loss = nn.MSELoss()
         elif self.gan_type == 'wgan':
@@ -86,7 +87,7 @@ class GANLoss(nn.Module):
         target_val = (self.real_label_val if target_is_real else self.fake_label_val)
         return input.new_ones(input.size()) * target_val
 
-    def forward(self, input, target_is_real, is_disc=False):
+    def forward(self, input, target_is_real, is_disc=False, pos_weight=None):
         """
         Args:
             input (Tensor): The input for the loss module, i.e., the network
@@ -107,7 +108,11 @@ class GANLoss(nn.Module):
                 loss = -input.mean()
         else:  # other gan types
             loss = self.loss(input, target_label)
-
+            if  pos_weight is None:
+                loss = loss.mean()
+            else:
+                loss = loss * pos_weight
+                loss = loss.mean()
         # loss_weight is always 1.0 for discriminators
         return loss if is_disc else loss * self.loss_weight
 

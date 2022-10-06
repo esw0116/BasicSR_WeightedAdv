@@ -37,8 +37,12 @@ class ESRGANModel(SRGANModel):
             # gan loss (relativistic gan)
             real_d_pred = self.net_d(self.gt).detach()
             fake_g_pred = self.net_d(self.output)
-            l_g_real = self.cri_gan(real_d_pred - torch.mean(fake_g_pred), False, is_disc=False)
-            l_g_fake = self.cri_gan(fake_g_pred - torch.mean(real_d_pred), True, is_disc=False)
+            if hasattr(self, 'coeff'):
+                pos_weight = self.coeff
+            else:
+                pos_weight = None
+            l_g_real = self.cri_gan(real_d_pred - torch.mean(fake_g_pred), False, is_disc=False, pos_weight=pos_weight)
+            l_g_fake = self.cri_gan(fake_g_pred - torch.mean(real_d_pred), True, is_disc=False, pos_weight=pos_weight)
             l_g_gan = (l_g_real + l_g_fake) / 2
 
             l_g_total += l_g_gan
