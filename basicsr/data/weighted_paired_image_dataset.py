@@ -3,10 +3,10 @@ import torch
 from torch.utils import data as data
 from torchvision.transforms.functional import normalize, to_grayscale
 
-from basicsr.data.data_util import weighted_paired_paths_from_folder, paired_paths_from_lmdb, paired_paths_from_meta_info_file
-from basicsr.data.weighted_transforms import augment, paired_random_crop
-from basicsr.utils import FileClient, bgr2ycbcr, imfrombytes, img2tensor
-from basicsr.utils.registry import DATASET_REGISTRY
+from data.data_util import weighted_paired_paths_from_folder, paired_paths_from_lmdb, paired_paths_from_meta_info_file
+from data.weighted_transforms import augment, paired_random_crop
+from utils import FileClient, bgr2ycbcr, imfrombytes, img2tensor
+from utils.registry import DATASET_REGISTRY
 
 
 @DATASET_REGISTRY.register()
