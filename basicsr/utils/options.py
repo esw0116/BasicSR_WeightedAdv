@@ -110,6 +110,9 @@ def parse_options(root_path, is_train=True):
     # parse yml to dict
     opt = yaml_load(args.opt)
 
+    print(os.path.abspath(args.opt))
+    print(opt)
+
     # distributed settings
     if args.launcher == 'none':
         opt['dist'] = False

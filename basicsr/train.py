@@ -3,7 +3,9 @@ import logging
 import math
 import time
 import torch
+import os
 from os import path as osp
+import nsml
 
 from data import build_dataloader, build_dataset
 from data.data_sampler import EnlargedSampler
@@ -96,21 +98,21 @@ def train_pipeline(root_path):
     torch.backends.cudnn.benchmark = True
     # torch.backends.cudnn.deterministic = True
 
-    # load resume states if necessary
-    resume_state = load_resume_state(opt)
-    # mkdir for experiments and logger
-    if resume_state is None:
-        make_exp_dirs(opt)
-        if opt['logger'].get('use_tb_logger') and 'debug' not in opt['name'] and opt['rank'] == 0:
-            mkdir_and_rename(osp.join(opt['root_path'], 'tb_logger', opt['name']))
+    # # load resume states if necessary
+    # resume_state = load_resume_state(opt)
+    # # mkdir for experiments and logger
+    # if resume_state is None:
+    #     make_exp_dirs(opt)
+    #     if opt['logger'].get('use_tb_logger') and 'debug' not in opt['name'] and opt['rank'] == 0:
+    #         mkdir_and_rename(osp.join(opt['root_path'], 'tb_logger', opt['name']))
 
     # copy the yml file to the experiment root
-    copy_opt_file(args.opt, opt['path']['experiments_root'])
+    # copy_opt_file(args.opt, opt['path']['experiments_root'])
 
     # WARNING: should not use get_root_logger in the above codes, including the called functions
     # Otherwise the logger will not be properly initialized
-    log_file = osp.join(opt['path']['log'], f"train_{opt['name']}_{get_time_str()}.log")
-    logger = get_root_logger(logger_name='basicsr', log_level=logging.INFO, log_file=log_file)
+    # log_file = osp.join(opt['path']['log'], f"train_{opt['name']}_{get_time_str()}.log")
+    logger = get_root_logger(logger_name='basicsr', log_level=logging.INFO, log_file=None) #log_file)
     logger.info(get_env_info())
     logger.info(dict2str(opt))
     # initialize wandb and tb loggers
@@ -122,14 +124,28 @@ def train_pipeline(root_path):
 
     # create model
     model = build_model(opt)
-    if resume_state:  # resume training
-        model.resume_training(resume_state)  # handle optimizers and schedulers
-        logger.info(f"Resuming training from epoch: {resume_state['epoch']}, iter: {resume_state['iter']}.")
-        start_epoch = resume_state['epoch']
-        current_iter = resume_state['iter']
-    else:
-        start_epoch = 0
-        current_iter = 0
+    # if resume_state:  # resume training
+    #     model.resume_training(resume_state)  # handle optimizers and schedulers
+    #     logger.info(f"Resuming training from epoch: {resume_state['epoch']}, iter: {resume_state['iter']}.")
+    #     start_epoch = resume_state['epoch']
+    #     current_iter = resume_state['iter']
+    # else:
+    #     start_epoch = 0
+    #     current_iter = 0
+    start_epoch = 0
+    current_iter = 0
+
+    def nsml_save(filename, **kwargs):
+        save_filename = 'G.pth'
+        filename = os.path.join(filename, save_filename)
+        network = model.get_bare_model(model.net_g)
+        state_dict = network.state_dict()
+        for key, param in state_dict.items():
+            state_dict[key] = param.cpu()
+        print(filename)
+        torch.save(state_dict, filename)
+
+    nsml.bind(save=nsml_save)
 
     # create message logger (formatted outputs)
     msg_logger = MessageLogger(opt, current_iter, tb_logger)
@@ -172,6 +188,7 @@ def train_pipeline(root_path):
                 # reset start time in msg_logger for more accurate eta_time
                 # not work in resume mode
                 msg_logger.reset_start_time()
+                
             # log
             if current_iter % opt['logger']['print_freq'] == 0:
                 log_vars = {'epoch': epoch, 'iter': current_iter}
@@ -179,11 +196,15 @@ def train_pipeline(root_path):
                 log_vars.update({'time': iter_timer.get_avg_time(), 'data_time': data_timer.get_avg_time()})
                 log_vars.update(model.get_current_log())
                 msg_logger(log_vars)
+                print('epoch: {},\titer: {}'.format(epoch, current_iter))
+                nsml.report(step=current_iter, **model.log_dict)
 
             # save models and training states
             if current_iter % opt['logger']['save_checkpoint_freq'] == 0:
                 logger.info('Saving models and training states.')
-                model.save(epoch, current_iter)
+                # model.save(epoch, current_iter)
+                checkpoint = '{}'.format(current_iter)
+                nsml.save(checkpoint=checkpoint)
 
             # validation
             if opt.get('val') is not None and (current_iter % opt['val']['val_freq'] == 0):
@@ -191,7 +212,7 @@ def train_pipeline(root_path):
                     logger.warning('Multiple validation datasets are *only* supported by SRModel.')
                 for val_loader in val_loaders:
                     model.validation(val_loader, current_iter, tb_logger, opt['val']['save_img'])
-
+                nsml.report(step=current_iter, **model.metric_results)
             data_timer.start()
             iter_timer.start()
             train_data = prefetcher.next()

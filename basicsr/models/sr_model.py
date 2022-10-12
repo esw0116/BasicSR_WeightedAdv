@@ -1,3 +1,5 @@
+from nsml import DATASET_PATH
+import os
 import torch
 from collections import OrderedDict
 from os import path as osp
@@ -25,6 +27,7 @@ class SRModel(BaseModel):
 
         # load pretrained models
         load_path = self.opt['path'].get('pretrain_network_g', None)
+        load_path = os.path.join(DATASET_PATH, load_path)
         if load_path is not None:
             param_key = self.opt['path'].get('param_key_g', 'params')
             self.load_network(self.net_g, load_path, self.opt['path'].get('strict_load_g', True), param_key)
@@ -258,7 +261,7 @@ class SRModel(BaseModel):
                 log_str += (f'\tBest: {self.best_metric_results[dataset_name][metric]["val"]:.4f} @ '
                             f'{self.best_metric_results[dataset_name][metric]["iter"]} iter')
             log_str += '\n'
-
+        print(log_str)
         logger = get_root_logger()
         logger.info(log_str)
         if tb_logger:
