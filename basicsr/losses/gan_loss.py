@@ -20,13 +20,17 @@ class GANLoss(nn.Module):
             for discriminators.
     """
 
-    def __init__(self, gan_type, real_label_val=1.0, fake_label_val=0.0, loss_weight=1.0, var_weight=False):
+    def __init__(self, gan_type, real_label_val=1.0, fake_label_val=0.0, loss_weight=1.0, var_weight=False, weight_func=None):
         super(GANLoss, self).__init__()
         self.gan_type = gan_type
         self.loss_weight = loss_weight
         self.real_label_val = real_label_val
         self.fake_label_val = fake_label_val
         self.var_weight = 'none' if var_weight else 'mean'
+        if weight_func == 'sqrt':
+            self.weight_func = torch.sqrt
+        else:
+            self.weight_func = None
 
         if self.gan_type == 'vanilla':
             self.loss = nn.BCEWithLogitsLoss(reduction=self.var_weight)
@@ -111,6 +115,8 @@ class GANLoss(nn.Module):
             if  pos_weight is None:
                 loss = loss.mean()
             else:
+                if self.weight_func is not None:
+                    pos_weight = self.weight_func(pos_weight)
                 loss = loss * pos_weight
                 loss = loss.mean()
         # loss_weight is always 1.0 for discriminators
