@@ -1,4 +1,4 @@
-name: ESRGAN_SRx4_Weight_1e-2_sqrt_80000
+name: ESRGAN_SRx4_Weight_5e-4_sqrt
 model_type: ESRGANModel
 scale: 4
 num_gpu: 1  # set num_gpu: 0 for cpu mode
@@ -57,7 +57,7 @@ network_g:
 
 # path
 path:
-  pretrain_network_g: experiments/NSML_models/6/G_80000.pth
+  pretrain_network_g: nsml_models/KR80934_CVLAB_SR5_23/200000/model/G.pth
   strict_load_g: true
   param_key_g: ~
 
