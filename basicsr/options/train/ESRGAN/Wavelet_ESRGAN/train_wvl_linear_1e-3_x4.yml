@@ -1,6 +1,6 @@
 # general settings
 name: 052_ESRGAN_x4_f64b23_DIV2K_400k_B16G1_Weighted_UnetDisc
-model_type: ESRGANModel
+model_type: WaveletESRGANModel
 scale: 4
 num_gpu: 1  # set num_gpu: 0 for cpu mode
 manual_seed: 0
@@ -9,10 +9,9 @@ manual_seed: 0
 datasets:
   train:
     name: DIV2K
-    type: WeightPairedImageDataset
+    type: PairedImageDataset
     dataroot_gt: train/DIV2K/DIV2K_train_HR
     dataroot_lq: train/DIV2K/DIV2K_train_LR_bicubic/X4
-    dataroot_weight: train/DIV2K/DIV2K_train_std
     # (for lmdb)
     # dataroot_gt: datasets/DIV2K/DIV2K_train_HR_sub.lmdb
     # dataroot_lq: datasets/DIV2K/DIV2K_train_LR_bicubic_X4_sub.lmdb
@@ -44,7 +43,7 @@ datasets:
 
 # network structures
 network_g:
-  type: RRDBNet
+  type: MyRRDBNet
   num_in_ch: 3
   num_out_ch: 3
   num_feat: 64
@@ -58,7 +57,7 @@ network_d:
 
 # path
 path:
-  pretrain_network_g: train/pretrained_models/ESRGAN_PSNR_SRx4_DF2K_official.pth
+  pretrain_network_g: train/pretrained_models/RRDB_PSNR_x4.pth
   strict_load_g: true
   resume_state: ~
 
@@ -78,10 +77,10 @@ train:
 
   scheduler:
     type: MultiStepLR
-    milestones: [50000, 100000, 200000]
+    milestones: [100000, 150000]
     gamma: 0.5
 
-  total_iter: 300000
+  total_iter: 200000
   warmup_iter: -1  # no warm up
 
   # losses
@@ -104,7 +103,7 @@ train:
     gan_type: vanilla
     real_label_val: 1.0
     fake_label_val: 0.0
-    loss_weight: !!float 5e-3
+    loss_weight: !!float 1e-3
     var_weight: true
 
   net_d_iters: 1
@@ -119,7 +118,7 @@ val:
     psnr: # metric name, can be arbitrary
       type: calculate_psnr
       crop_border: 4
-      test_y_channel: false
+      test_y_channel: true
     ssim:
       type: calculate_ssim
       crop_border: 4

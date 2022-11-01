@@ -27,6 +27,7 @@ class WeightedESRGANModel(SRModel):
             self.net_g_ema = build_network(self.opt['network_g']).to(self.device)
             # load pretrained model
             load_path = self.opt['path'].get('pretrain_network_g', None)
+            print(load_path)
             if load_path is not None:
                 load_path = os.path.join(DATASET_PATH, load_path)
                 self.load_network(self.net_g_ema, load_path, self.opt['path'].get('strict_load_g', True), 'params_ema')
@@ -180,3 +181,11 @@ class WeightedESRGANModel(SRModel):
 
         if self.ema_decay > 0:
             self.model_ema(decay=self.ema_decay)
+
+    def save(self, epoch, current_iter):
+        if hasattr(self, 'net_g_ema'):
+            self.save_network([self.net_g, self.net_g_ema], 'net_g', current_iter, param_key=['params', 'params_ema'])
+        else:
+            self.save_network(self.net_g, 'net_g', current_iter)
+            self.save_network(self.net_w, 'net_w', current_iter)
+        self.save_training_state(epoch, current_iter)

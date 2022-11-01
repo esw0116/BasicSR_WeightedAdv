@@ -27,8 +27,9 @@ class SRGANModel(SRModel):
             self.net_g_ema = build_network(self.opt['network_g']).to(self.device)
             # load pretrained model
             load_path = self.opt['path'].get('pretrain_network_g', None)
-            load_path = os.path.join(DATASET_PATH, load_path)
+            print(load_path)
             if load_path is not None:
+                load_path = os.path.join(DATASET_PATH, load_path)
                 self.load_network(self.net_g_ema, load_path, self.opt['path'].get('strict_load_g', True), 'params_ema')
             else:
                 self.model_ema(0)  # copy net_g weight

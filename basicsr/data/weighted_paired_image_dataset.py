@@ -112,7 +112,7 @@ class WeightPairedImageDataset(data.Dataset):
             normalize(img_lq, self.mean, self.std, inplace=True)
             normalize(img_gt, self.mean, self.std, inplace=True)
         
-        img_coeff = torch.mean(img_coeff.mul(torch.Tensor([65.481/255, 128.553/255, 24.966/255]).reshape(3,1,1)), dim=0) + 16/255
+        img_coeff = torch.sum(img_coeff.mul(torch.Tensor([65.481/255, 128.553/255, 24.966/255]).reshape(3,1,1)), dim=0) + 16/255
 
         return {'lq': img_lq, 'gt': img_gt, 'coeff': img_coeff, 'lq_path': lq_path, 'gt_path': gt_path}
 
