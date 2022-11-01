@@ -17,8 +17,10 @@ def main():
     # -------------------------------------------------------------------------
     dataset = 'Urban100'
     folder_gt = './dataset/benchmark/{}/HR'.format(dataset)
-    folder_restored = './results/ESRGAN_SRx4_DF2KOST_BaseGAN/visualization/{}'.format(dataset)
+    folder_restored = './results/ESRGAN_SRx4_Weight_5e-3_sqrt_140000/visualization/{}'.format(dataset)
     # folder_restored = './results/ESRGAN_SRx4_DF2KOST_WeightedGAN/visualization/{}'.format(dataset)
+    # folder_restored = './results/ESRGAN_SRx4_DF2KOST_BaseGAN/visualization/{}'.format(dataset)
+    # folder_restored = './results/ESRGAN_SRx4_DF2KOST_official/visualization/{}'.format(dataset)
     # crop_border = 4
     suffix = ''
     # -------------------------------------------------------------------------
@@ -51,7 +53,7 @@ def main():
         lpips_val = lpips_val.item()
         # breakpoint()
 
-        print(f'{i+1:3d}: {basename:25}. \tLPIPS: {lpips_val:.6f}.')
+        # print(f'{i+1:3d}: {basename:25}. \tLPIPS: {lpips_val:.6f}.')
         lpips_all.append(lpips_val)
 
     print(f'Average: LPIPS: {sum(lpips_all) / len(lpips_all):.6f}')

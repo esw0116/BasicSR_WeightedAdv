@@ -1,4 +1,4 @@
-name: ESRGAN_SRx4_DF2KOST_official
+name: ESRGAN_SRx4_Weight_5e-3_sqrt_140000
 model_type: ESRGANModel
 scale: 4
 num_gpu: 1  # set num_gpu: 0 for cpu mode
@@ -37,11 +37,11 @@ datasets:
     filename_tmpl: '{}x4'
     io_backend:
       type: disk
-  # test_3:
+  # test_4:
   #   name: DIV2K100
   #   type: PairedImageDataset
-  #   dataroot_gt: datasets/DIV2K/DIV2K_valid_HR
-  #   dataroot_lq: datasets/DIV2K/DIV2K_valid_LR_bicubic/X4
+  #   dataroot_gt: dataset/DIV2K/DIV2K_valid_HR
+  #   dataroot_lq: dataset/DIV2K/DIV2K_valid_LR_bicubic/X4
   #   filename_tmpl: '{}x4'
   #   io_backend:
   #     type: disk
@@ -57,8 +57,9 @@ network_g:
 
 # path
 path:
-  pretrain_network_g: experiments/pretrained_models/ESRGAN/ESRGAN_PSNR_SRx4_DF2K_official-150ff491.pth
+  pretrain_network_g: experiments/NSML_models/7/G_140000.pth
   strict_load_g: true
+  param_key_g: ~
 
 # validation settings
 val:
@@ -69,11 +70,11 @@ val:
     psnr: # metric name, can be arbitrary
       type: calculate_psnr
       crop_border: 4
-      test_y_channel: True
+      test_y_channel: true
     ssim:
       type: calculate_ssim
       crop_border: 4
-      test_y_channel: True
+      test_y_channel: true
     niqe:
       type: calculate_niqe
       crop_border: 4
