@@ -1,12 +1,14 @@
 import torch
+from torch.nn import functional as F
 from collections import OrderedDict
+from pytorch_wavelet import Haar2
 
 from utils.registry import MODEL_REGISTRY
 from .srgan_model import SRGANModel
 
 
 @MODEL_REGISTRY.register()
-class ESRGANModel(SRGANModel):
+class WaveletSRGANModel(SRGANModel):
     """ESRGAN model for single image super-resolution."""
 
     def optimize_parameters(self, current_iter):
@@ -17,39 +19,41 @@ class ESRGANModel(SRGANModel):
         self.optimizer_g.zero_grad()
         self.output = self.net_g(self.lq)
 
-        if hasattr(self, 'coeff'):
-            self.pos_weight = self.coeff.unsqueeze(1)
-            norm_quantile = self.opt['train']['weightgan']['quantile']
-            gamma = self.opt['train']['weightgan']['gamma']
+        gray_coeffs = torch.Tensor([65.738 / 256, 129.057 / 256, 25.064 / 256]).reshape((1,3,1,1)).to(self.lq.device)
+        # gray_gt = torch.sum(self.gt * gray_coeffs, dim=1, keepdim=True)
+        gray_out = torch.sum(self.output * gray_coeffs, dim=1, keepdim=True)
+        h, w = gray_out.shape[-2:]
+        xfm = Haar2(device=self.lq.device)
+        gray_out = gray_out.permute(2,3,0,1)
+        wavelet_out = xfm.forward(gray_out, dtype=self.output.dtype)
+        wavelet_out = torch.stack(wavelet_out[1:], dim=0)
+        wavelet_out = torch.max(wavelet_out, dim=0)[0]
+        wavelet_out = wavelet_out.permute(2,3,0,1)
+        self.pos_weight = F.interpolate(wavelet_out, size=(h,w), mode='bilinear', align_corners=True)
+        # xfm = DWTForward(J=1, mode='zero', wave='haar')
+        # xfm = xfm.to(self.lq.device)
+        # gol, goh = xfm(gray_out)
 
-            # Normalize (low 10% -> 0, high 10% -> 1)
-            b, c, h, w = self.pos_weight.shape
-            self.pos_weight = self.pos_weight.reshape(b, c, h*w)
-            low10 = torch.quantile(self.pos_weight, norm_quantile, dim=2, keepdim=True)
-            hi10 =  torch.quantile(self.pos_weight, 1-norm_quantile, dim=2, keepdim=True)
-            self.pos_weight = (self.pos_weight -low10) / (hi10 - low10)
-            self.pos_weight = self.pos_weight.clamp(0, 1)
-            self.pos_weight = self.pos_weight.reshape(b,c,h,w)
-
-            # Add non-linearity
-            self.pos_weight = torch.pow(self.pos_weight, gamma)
-        else:
-            self.pos_weight = None
+        # Normalize (low 10% -> 0, high 10% -> 1)
+        b, c, h, w = self.pos_weight.shape
+        self.pos_weight = self.pos_weight.reshape(b, c, h*w)
+        low10 = torch.quantile(self.pos_weight, 0.1, dim=2, keepdim=True)
+        hi10 =  torch.quantile(self.pos_weight, 0.9, dim=2, keepdim=True)
+        self.pos_weight = (self.pos_weight -low10) / (hi10 - low10)
+        self.pos_weight = self.pos_weight.clamp(0,1)
+        self.pos_weight = self.pos_weight.reshape(b,c,h,w)
 
         l_g_total = 0
         loss_dict = OrderedDict()
         if (current_iter % self.net_d_iters == 0 and current_iter > self.net_d_init_iters):
             # pixel loss
             if self.cri_pix:
-                if self.pos_weight is None:
-                    l_g_pix = self.cri_pix(self.output, self.gt)
-                else:
-                    l_g_pix = self.cri_pix(self.output, self.gt, pos_weight=1-0.01*self.pos_weight)
+                l_g_pix = self.cri_pix(self.output, self.gt)
                 l_g_total += l_g_pix
                 loss_dict['l_g_pix'] = l_g_pix
             # perceptual loss
             if self.cri_perceptual:
-                l_g_percep, l_g_style = self.cri_perceptual(self.output, self.gt, pos_weight=self.pos_weight)
+                l_g_percep, l_g_style = self.cri_perceptual(self.output, self.gt)
                 if l_g_percep is not None:
                     l_g_total += l_g_percep
                     loss_dict['l_g_percep'] = l_g_percep
@@ -60,7 +64,7 @@ class ESRGANModel(SRGANModel):
             real_d_pred = self.net_d(self.gt).detach()
             fake_g_pred = self.net_d(self.output)
 
-            l_g_real = self.cri_gan(real_d_pred - torch.mean(fake_g_pred), False, is_disc=False, pos_weight=self.pos_weight)
+            # l_g_real = self.cri_gan(real_d_pred - torch.mean(fake_g_pred), False, is_disc=False, pos_weight=self.pos_weight)
             l_g_fake = self.cri_gan(fake_g_pred - torch.mean(real_d_pred), True, is_disc=False, pos_weight=self.pos_weight)
             l_g_gan = (l_g_real + l_g_fake) / 2
 

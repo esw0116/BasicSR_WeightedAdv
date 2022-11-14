@@ -42,14 +42,20 @@ class L1Loss(nn.Module):
         self.loss_weight = loss_weight
         self.reduction = reduction
 
-    def forward(self, pred, target, weight=None, **kwargs):
+    def forward(self, pred, target, weight=None, pos_weight=None, **kwargs):
         """
         Args:
             pred (Tensor): of shape (N, C, H, W). Predicted tensor.
             target (Tensor): of shape (N, C, H, W). Ground truth tensor.
             weight (Tensor, optional): of shape (N, C, H, W). Element-wise weights. Default: None.
         """
-        return self.loss_weight * l1_loss(pred, target, weight, reduction=self.reduction)
+        if pos_weight is not None:
+                loss = self.loss_weight * l1_loss(pred, target, weight, reduction='none')
+                loss = loss * pos_weight
+                loss = loss.mean()
+                return loss
+        else:
+            return self.loss_weight * l1_loss(pred, target, weight, reduction=self.reduction)
 
 
 @LOSS_REGISTRY.register()
@@ -70,15 +76,20 @@ class MSELoss(nn.Module):
         self.loss_weight = loss_weight
         self.reduction = reduction
 
-    def forward(self, pred, target, weight=None, **kwargs):
+    def forward(self, pred, target, weight=None, pos_weight=None, **kwargs):
         """
         Args:
             pred (Tensor): of shape (N, C, H, W). Predicted tensor.
             target (Tensor): of shape (N, C, H, W). Ground truth tensor.
             weight (Tensor, optional): of shape (N, C, H, W). Element-wise weights. Default: None.
         """
-        return self.loss_weight * mse_loss(pred, target, weight, reduction=self.reduction)
-
+        if pos_weight is not None:
+            loss = self.loss_weight * mse_loss(pred, target, weight, reduction='none')
+            loss = loss * pos_weight
+            loss = loss.mean()
+            return loss
+        else:
+            return self.loss_weight * mse_loss(pred, target, weight, reduction=self.reduction)
 
 @LOSS_REGISTRY.register()
 class CharbonnierLoss(nn.Module):
@@ -104,14 +115,21 @@ class CharbonnierLoss(nn.Module):
         self.reduction = reduction
         self.eps = eps
 
-    def forward(self, pred, target, weight=None, **kwargs):
+    def forward(self, pred, target, weight=None, pos_weight=None, **kwargs):
         """
         Args:
             pred (Tensor): of shape (N, C, H, W). Predicted tensor.
             target (Tensor): of shape (N, C, H, W). Ground truth tensor.
             weight (Tensor, optional): of shape (N, C, H, W). Element-wise weights. Default: None.
         """
-        return self.loss_weight * charbonnier_loss(pred, target, weight, eps=self.eps, reduction=self.reduction)
+
+        if pos_weight is not None:
+            loss = self.loss_weight * charbonnier_loss(pred, target, weight, eps=self.eps, reduction='none')
+            loss = loss * pos_weight
+            loss = loss.mean()
+            return loss
+        else:
+            return self.loss_weight * charbonnier_loss(pred, target, weight, eps=self.eps, reduction=self.reduction)
 
 
 @LOSS_REGISTRY.register()
@@ -187,7 +205,7 @@ class PerceptualLoss(nn.Module):
 
         self.criterion_type = criterion
         if self.criterion_type == 'l1':
-            self.criterion = torch.nn.L1Loss()
+            self.criterion = torch.nn.L1Loss(reduction='none')
         elif self.criterion_type == 'l2':
             self.criterion = torch.nn.L2loss()
         elif self.criterion_type == 'fro':
@@ -195,7 +213,7 @@ class PerceptualLoss(nn.Module):
         else:
             raise NotImplementedError(f'{criterion} criterion has not been supported.')
 
-    def forward(self, x, gt):
+    def forward(self, x, gt, pos_weight=None):
         """Forward function.
 
         Args:
@@ -216,7 +234,14 @@ class PerceptualLoss(nn.Module):
                 if self.criterion_type == 'fro':
                     percep_loss += torch.norm(x_features[k] - gt_features[k], p='fro') * self.layer_weights[k]
                 else:
-                    percep_loss += self.criterion(x_features[k], gt_features[k]) * self.layer_weights[k]
+                    if pos_weight is not None:
+                        percep_loss_map = self.criterion(x_features[k], gt_features[k]) * self.layer_weights[k]
+                        h, w = percep_loss_map.shape[-2:]
+                        s_pos_weight = F.interpolate(pos_weight, size=(h,w), mode='bilinear', align_corners=True)
+                        percep_loss_map = percep_loss_map * s_pos_weight
+                        percep_loss += percep_loss_map.mean()
+                    else:
+                        percep_loss += self.criterion(x_features[k], gt_features[k]).mean() * self.layer_weights[k]
             percep_loss *= self.perceptual_weight
         else:
             percep_loss = None
