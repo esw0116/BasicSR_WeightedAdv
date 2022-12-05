@@ -21,7 +21,7 @@ class WaveletESRGANModel(SRGANModel):
 
         gray_coeffs = torch.Tensor([65.738 / 256, 129.057 / 256, 25.064 / 256]).reshape((1,3,1,1)).to(self.lq.device)
         # gray_gt = torch.sum(self.gt * gray_coeffs, dim=1, keepdim=True)
-        gray_out = torch.sum(self.output * gray_coeffs, dim=1, keepdim=True)
+        gray_out = torch.sum(self.gt * gray_coeffs, dim=1, keepdim=True)
         h, w = gray_out.shape[-2:]
         xfm = Haar2(device=self.lq.device)
         gray_out = gray_out.permute(2,3,0,1)
@@ -36,15 +36,19 @@ class WaveletESRGANModel(SRGANModel):
 
         norm_quantile = self.opt['train']['weightgan']['quantile']
         gamma = self.opt['train']['weightgan']['gamma']
+        smooth = self.opt['train']['weightgan']['blur'] if 'blur' in self.opt['train']['weightgan'] else False
+        if smooth:
+            blur_k = torch.ones((1,1,7,7)).type_as(self.pos_weight) / 49
+            self.pos_weight = F.conv2d(self.pos_weight, blur_k, padding=3)
 
         # Normalize (low 10% -> 0, high 10% -> 1)
-        b, c, h, w = self.pos_weight.shape
-        self.pos_weight = self.pos_weight.reshape(b, c, h*w)
-        low10 = torch.quantile(self.pos_weight, norm_quantile, dim=2, keepdim=True)
-        hi10 =  torch.quantile(self.pos_weight, 1-norm_quantile, dim=2, keepdim=True)
-        self.pos_weight = (self.pos_weight -low10) / (hi10 - low10)
+        # b, c, h, w = self.pos_weight.shape
+        # self.pos_weight = self.pos_weight.reshape(b, c, h*w)
+        # low10 = torch.quantile(self.pos_weight, norm_quantile, dim=2, keepdim=True)
+        # hi10 =  torch.quantile(self.pos_weight, 1-norm_quantile, dim=2, keepdim=True)
+        # self.pos_weight = (self.pos_weight -low10) / (hi10 - low10)
         self.pos_weight = self.pos_weight.clamp(0, 1)
-        self.pos_weight = self.pos_weight.reshape(b,c,h,w)
+        # self.pos_weight = self.pos_weight.reshape(b,c,h,w)
 
         # Add non-linearity
         self.pos_weight = torch.pow(self.pos_weight, gamma)

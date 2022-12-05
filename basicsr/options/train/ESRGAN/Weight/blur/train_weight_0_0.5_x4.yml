@@ -81,12 +81,13 @@ train:
     milestones: [100000, 150000]
     gamma: 0.5
 
-  total_iter: 60000
+  total_iter: 100000
   warmup_iter: -1  # no warm up
 
   weightgan:
-    quantile: 0.1
+    quantile: 0
     gamma: 0.5
+    blur: true
 
   # losses
   pixel_opt:

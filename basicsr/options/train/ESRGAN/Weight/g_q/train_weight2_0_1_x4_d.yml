@@ -1,6 +1,6 @@
 # general settings
 name: 052_ESRGAN_x4_f64b23_DIV2K_400k_B16G1_Weighted_UnetDisc
-model_type: ESRGANModel
+model_type: ESRGAN2Model
 scale: 4
 num_gpu: 1  # set num_gpu: 0 for cpu mode
 manual_seed: 0
@@ -67,7 +67,7 @@ train:
   ema_decay: 0.999
   optim_g:
     type: Adam
-    lr: !!float 2e-4
+    lr: !!float 1e-4
     weight_decay: 0
     betas: [0.9, 0.99]
   optim_d:
@@ -81,12 +81,13 @@ train:
     milestones: [100000, 150000]
     gamma: 0.5
 
-  total_iter: 60000
+  total_iter: 160000
   warmup_iter: -1  # no warm up
 
   weightgan:
-    quantile: 0.1
-    gamma: 0.5
+    quantile: 0
+    gamma: 1
+    apply_d: true
 
   # losses
   pixel_opt:
@@ -108,7 +109,7 @@ train:
     gan_type: vanilla
     real_label_val: 1.0
     fake_label_val: 0.0
-    loss_weight: !!float 1e-3
+    loss_weight: !!float 5e-3
     var_weight: true
 
   net_d_iters: 1
@@ -116,7 +117,7 @@ train:
 
 # validation settings
 val:
-  val_freq: !!float 1e4
+  val_freq: !!float 5e3
   save_img: false
 
   metrics:
@@ -128,10 +129,10 @@ val:
       type: calculate_ssim
       crop_border: 4
       test_y_channel: true
-    # niqe:
-    #   type: calculate_niqe
-    #   crop_border: 4
-    #   better: lower
+    niqe:
+      type: calculate_niqe
+      crop_border: 4
+      better: lower
 
 # logging settings
 logger:

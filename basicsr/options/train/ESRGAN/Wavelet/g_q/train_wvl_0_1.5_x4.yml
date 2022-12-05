@@ -1,6 +1,6 @@
 # general settings
 name: 052_ESRGAN_x4_f64b23_DIV2K_400k_B16G1_Weighted_UnetDisc
-model_type: ESRGANModel
+model_type: WaveletESRGANModel
 scale: 4
 num_gpu: 1  # set num_gpu: 0 for cpu mode
 manual_seed: 0
@@ -9,10 +9,9 @@ manual_seed: 0
 datasets:
   train:
     name: DIV2K
-    type: WeightPairedImageDataset
+    type: PairedImageDataset
     dataroot_gt: train/DIV2K/DIV2K_train_HR
     dataroot_lq: train/DIV2K/DIV2K_train_LR_bicubic/X4
-    dataroot_weight: train/DIV2K/DIV2K_train_std
     # (for lmdb)
     # dataroot_gt: datasets/DIV2K/DIV2K_train_HR_sub.lmdb
     # dataroot_lq: datasets/DIV2K/DIV2K_train_LR_bicubic_X4_sub.lmdb
@@ -81,12 +80,13 @@ train:
     milestones: [100000, 150000]
     gamma: 0.5
 
-  total_iter: 60000
+  total_iter: 100000
   warmup_iter: -1  # no warm up
 
   weightgan:
-    quantile: 0.1
-    gamma: 0.5
+    quantile: 0
+    gamma: 1.5
+    blur: false
 
   # losses
   pixel_opt:

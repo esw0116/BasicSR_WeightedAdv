@@ -1,4 +1,5 @@
 import torch
+from torch import autograd
 from torch import nn
 from torch.nn import functional as F
 from collections import OrderedDict
@@ -8,7 +9,7 @@ from .srgan_model import SRGANModel
 
 
 @MODEL_REGISTRY.register()
-class ESRGANModel(SRGANModel):
+class ESRGANGradModel(SRGANModel):
     """ESRGAN model for single image super-resolution."""
 
     def optimize_parameters(self, current_iter):
@@ -23,11 +24,12 @@ class ESRGANModel(SRGANModel):
             self.pos_weight = self.coeff
             norm_quantile = self.opt['train']['weightgan']['quantile']
             gamma = self.opt['train']['weightgan']['gamma']
+
             map_process = self.opt['train']['weightgan']['blur'] if 'blur' in self.opt['train']['weightgan'] else None
-            if map_process == 'average' or map_process is True:
+            if map_process == 'Average' or map_process is True:
                 blur_k = torch.ones((1,1,7,7)).type_as(self.pos_weight) / 49
                 self.pos_weight = F.conv2d(self.pos_weight, blur_k, padding=3)
-            elif map_process == 'median':
+            elif map_process == 'Median':
                 m = nn.ReplicationPad2d(3)
                 h, w = self.pos_weight.shape[-2:]
                 self.pos_weight = m(self.pos_weight)
@@ -71,18 +73,22 @@ class ESRGANModel(SRGANModel):
                 if l_g_style is not None:
                     l_g_total += l_g_style
                     loss_dict['l_g_style'] = l_g_style
+            l_g_total.backward(retain_graph=True)
+            
             # gan loss (relativistic gan)
             real_d_pred = self.net_d(self.gt).detach()
             fake_g_pred = self.net_d(self.output)
-
-            l_g_real = self.cri_gan(real_d_pred - torch.mean(fake_g_pred), False, is_disc=False, pos_weight=self.pos_weight)
-            l_g_fake = self.cri_gan(fake_g_pred - torch.mean(real_d_pred), True, is_disc=False, pos_weight=self.pos_weight)
+            l_g_real = self.cri_gan(real_d_pred - torch.mean(fake_g_pred), False, is_disc=False, pos_weight=None)
+            l_g_fake = self.cri_gan(fake_g_pred - torch.mean(real_d_pred), True, is_disc=False, pos_weight= None)
             l_g_gan = (l_g_real + l_g_fake) / 2
+            # l_g_gan.backward(retain_graph=True, inputs=self.output)
+            out_g_grad = autograd.grad(outputs=l_g_gan, inputs=self.output, retain_graph=True)[0]
+            self.output.backward(gradient=out_g_grad * self.pos_weight)
 
             l_g_total += l_g_gan
             loss_dict['l_g_gan'] = l_g_gan
 
-            l_g_total.backward()
+            # l_g_total.backward()
             self.optimizer_g.step()
 
         # optimize net_d
@@ -108,6 +114,9 @@ class ESRGANModel(SRGANModel):
         else:
             l_d_real = self.cri_gan(real_d_pred - torch.mean(fake_d_pred), True, is_disc=True) * 0.5
         l_d_real.backward()
+        # out_d1_grad = autograd.grad(outputs=l_g_gan, inputs=self.output, retain_graph=True)[0]
+        # self.output.backward(gradient=out_d1_grad * self.pos_weight)
+
         # fake
         fake_d_pred = self.net_d(self.output.detach())
         if apply_weight_d:

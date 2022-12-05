@@ -1,17 +1,19 @@
+import cv2
 import os
 import numpy as np
 import torch
 from torch.utils import data as data
 from torchvision.transforms.functional import normalize, to_grayscale
+import pywt
 
-from data.data_util import weighted_paired_paths_from_folder, paired_paths_from_lmdb, paired_paths_from_meta_info_file
+from data.data_util import paired_paths_from_folder, paired_paths_from_lmdb, paired_paths_from_meta_info_file
 from data.weighted_transforms import augment, paired_random_crop
 from utils import FileClient, bgr2ycbcr, imfrombytes, img2tensor
 from utils.registry import DATASET_REGISTRY
 
 
 @DATASET_REGISTRY.register()
-class WeightPairedImageDataset(data.Dataset):
+class WaveletPairedImageDataset(data.Dataset):
     """Paired image dataset for image restoration.
 
     Read LQ (Low Quality, e.g. LR (Low Resolution), blurry, noisy, etc) and GT image pairs.
@@ -39,7 +41,7 @@ class WeightPairedImageDataset(data.Dataset):
     """
 
     def __init__(self, opt):
-        super(WeightPairedImageDataset, self).__init__()
+        super(WaveletPairedImageDataset, self).__init__()
         self.opt = opt
         # file client (io backend)
         self.file_client = None
@@ -49,9 +51,9 @@ class WeightPairedImageDataset(data.Dataset):
         
         if True:
             from nsml import DATASET_PATH
-            self.gt_folder, self.lq_folder, self.weight_folder = os.path.join(DATASET_PATH, opt['dataroot_gt']), os.path.join(DATASET_PATH, opt['dataroot_lq']), os.path.join(DATASET_PATH, opt['dataroot_weight'])
+            self.gt_folder, self.lq_folder = os.path.join(DATASET_PATH, opt['dataroot_gt']), os.path.join(DATASET_PATH, opt['dataroot_lq'])
         else:
-            self.gt_folder, self.lq_folder, self.weight_folder = opt['dataroot_gt'], opt['dataroot_lq'], opt['dataroot_weight']
+            self.gt_folder, self.lq_folder = opt['dataroot_gt'], opt['dataroot_lq']
 
         if 'filename_tmpl' in opt:
             self.filename_tmpl = opt['filename_tmpl']
@@ -66,7 +68,7 @@ class WeightPairedImageDataset(data.Dataset):
             self.paths = paired_paths_from_meta_info_file([self.lq_folder, self.gt_folder], ['lq', 'gt'],
                                                           self.opt['meta_info_file'], self.filename_tmpl)
         else:
-            self.paths = weighted_paired_paths_from_folder([self.lq_folder, self.gt_folder, self.weight_folder], ['lq', 'gt', 'weight'], self.filename_tmpl)
+            self.paths = paired_paths_from_folder([self.lq_folder, self.gt_folder], ['lq', 'gt'], self.filename_tmpl)
 
     def __getitem__(self, index):
         if self.file_client is None:
@@ -79,18 +81,28 @@ class WeightPairedImageDataset(data.Dataset):
         gt_path = self.paths[index]['gt_path']
         img_bytes = self.file_client.get(gt_path, 'gt')
         img_gt = imfrombytes(img_bytes, float32=True)
+        gt_h, gt_w = img_gt.shape[:2]
         lq_path = self.paths[index]['lq_path']
         img_bytes = self.file_client.get(lq_path, 'lq')
         img_lq = imfrombytes(img_bytes, float32=True)
-        
-        weight_path = self.paths[index]['weight_path']
-        img_bytes = self.file_client.get(weight_path, 'weight')
-        img_coeff = imfrombytes(img_bytes, float32=True)
-        img_coeff = np.sum(img_coeff * (np.array([65.481/255, 128.553/255, 24.966/255]).reshape(1,1,3)), axis=2, keepdims=True) + 16/255
 
+        img_gray = np.sum(img_gt * (np.array([65.481/255, 128.553/255, 24.966/255]).reshape(1,1,3)), axis=2) + 16/255
+        coeffs = pywt.dwt2(img_gray, 'haar')
+        hf_coeffs = np.stack(coeffs[1], axis=0)
+        hf_coeffs = np.abs(hf_coeffs)
+        hf_coeffs = np.max(hf_coeffs, axis=0)
+        h, w = hf_coeffs.shape
+        # img_coeff = hf_coeffs[:, :, np.newaxis]
+        img_coeff = hf_coeffs.reshape(h*w, 1)
         min10 = np.quantile(img_coeff, 0.1)
-        max10 = np.quantile(img_coeff, 0.9)
+        max10 = np.quantile(img_coeff, 0.999)
+        img_coeff = img_coeff.reshape(h,w,1)
+        img_coeff = cv2.resize(img_coeff, dsize=(gt_w, gt_h), interpolation=cv2.INTER_LINEAR)
 
+        img_coeff = (img_coeff - min10) / (max10 - min10)
+        img_coeff = img_coeff[:, :, np.newaxis]
+        # print(img_gt.shape, img_lq.shape, img_coeff.shape, max10, min10)
+        
         # augmentation for training
         if self.opt['phase'] == 'train':
             gt_size = self.opt['gt_size']

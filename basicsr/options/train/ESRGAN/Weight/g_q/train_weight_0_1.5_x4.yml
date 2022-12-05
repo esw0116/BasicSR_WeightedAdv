@@ -85,8 +85,8 @@ train:
   warmup_iter: -1  # no warm up
 
   weightgan:
-    quantile: 0.1
-    gamma: 0.5
+    quantile: 0
+    gamma: 1.5
 
   # losses
   pixel_opt:
