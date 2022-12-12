@@ -157,6 +157,16 @@ def train_pipeline(root_path):
         print('Save Std estimator!', filename)
         torch.save(state_dict, filename)
 
+    def nsml_save_d(filename, **kwargs):
+        save_filename = 'D.pth'
+        filename = os.path.join(filename, save_filename)
+        network = model.get_bare_model(model.net_d)
+        state_dict = network.state_dict()
+        for key, param in state_dict.items():
+            state_dict[key] = param.cpu()
+        print('Save Std estimator!', filename)
+        torch.save(state_dict, filename)
+
     # create message logger (formatted outputs)
     msg_logger = MessageLogger(opt, current_iter, tb_logger)
 
@@ -217,6 +227,8 @@ def train_pipeline(root_path):
                 nsml.save(checkpoint=checkpoint)
                 if hasattr(model, 'net_w'):
                     nsml.save(checkpoint=checkpoint, save_fn=nsml_save_w)
+                if hasattr(model, 'net_d'):
+                    nsml.save(checkpoint=checkpoint, save_fn=nsml_save_d)
 
             # validation
             if opt.get('val') is not None and (current_iter % opt['val']['val_freq'] == 0):

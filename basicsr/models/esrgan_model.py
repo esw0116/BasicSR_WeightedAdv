@@ -48,7 +48,7 @@ class ESRGANModel(SRGANModel):
             # Add non-linearity
             self.pos_weight = torch.pow(self.pos_weight, gamma)
         else:
-            self.pos_weight = None
+            self.pos_weight = torch.ones_like(self.output)[:,0:1,]
 
         l_g_total = 0
         loss_dict = OrderedDict()
@@ -59,7 +59,7 @@ class ESRGANModel(SRGANModel):
                 if self.pos_weight is None:
                     l_g_pix = self.cri_pix(self.output, self.gt)
                 else:
-                    l_g_pix = self.cri_pix(self.output, self.gt, pos_weight=None) # 1-0.01*self.pos_weight)
+                    l_g_pix = self.cri_pix(self.output, self.gt, pos_weight=1-weight_vgg*self.pos_weight)
                 l_g_total += l_g_pix
                 loss_dict['l_g_pix'] = l_g_pix
             # perceptual loss
@@ -86,7 +86,7 @@ class ESRGANModel(SRGANModel):
             self.optimizer_g.step()
 
         # optimize net_d
-        apply_weight_d = self.opt['train']['weightgan']['apply_d'] if 'apply_d' in self.opt['train']['weightgan'] else False
+        apply_weight_d = self.opt['train']['weightgan']['apply_d'] if 'apply_d' in self.opt['train']['weightgan'] else True
         for p in self.net_d.parameters():
             p.requires_grad = True
 
