@@ -137,35 +137,35 @@ def train_pipeline(root_path):
 
     def nsml_save(filename, **kwargs):
         save_filename = 'G.pth'
-        filename = os.path.join(filename, save_filename)
+        filename_g = os.path.join(filename, save_filename)
         network = model.get_bare_model(model.net_g)
         state_dict = network.state_dict()
         for key, param in state_dict.items():
             state_dict[key] = param.cpu()
-        print('Save Generator!', filename)
-        torch.save(state_dict, filename)
+        print('Save Generator!', filename_g)
+        torch.save(state_dict, filename_g)
+
+        if hasattr(model, 'net_w'):
+            save_filename = 'W.pth'
+            filename_w = os.path.join(filename, save_filename)
+            network = model.get_bare_model(model.net_w)
+            state_dict = network.state_dict()
+            for key, param in state_dict.items():
+                state_dict[key] = param.cpu()
+            print('Save Std estimator!', filename_w)
+            torch.save(state_dict, filename_w)
+
+        if hasattr(model, 'net_wd'):
+            save_filename = 'WD.pth'
+            filename_wd = os.path.join(filename, save_filename)
+            network = model.get_bare_model(model.net_wd)
+            state_dict = network.state_dict()
+            for key, param in state_dict.items():
+                state_dict[key] = param.cpu()
+            print('Save Std estimator!', filename_wd)
+            torch.save(state_dict, filename_wd)
 
     nsml.bind(save=nsml_save)
-
-    def nsml_save_w(filename, **kwargs):
-        save_filename = 'W.pth'
-        filename = os.path.join(filename, save_filename)
-        network = model.get_bare_model(model.net_w)
-        state_dict = network.state_dict()
-        for key, param in state_dict.items():
-            state_dict[key] = param.cpu()
-        print('Save Std estimator!', filename)
-        torch.save(state_dict, filename)
-
-    def nsml_save_d(filename, **kwargs):
-        save_filename = 'D.pth'
-        filename = os.path.join(filename, save_filename)
-        network = model.get_bare_model(model.net_d)
-        state_dict = network.state_dict()
-        for key, param in state_dict.items():
-            state_dict[key] = param.cpu()
-        print('Save Std estimator!', filename)
-        torch.save(state_dict, filename)
 
     # create message logger (formatted outputs)
     msg_logger = MessageLogger(opt, current_iter, tb_logger)
@@ -225,10 +225,6 @@ def train_pipeline(root_path):
                 # model.save(epoch, current_iter)
                 checkpoint = '{}'.format(current_iter)
                 nsml.save(checkpoint=checkpoint)
-                if hasattr(model, 'net_w'):
-                    nsml.save(checkpoint=checkpoint, save_fn=nsml_save_w)
-                if hasattr(model, 'net_d'):
-                    nsml.save(checkpoint=checkpoint, save_fn=nsml_save_d)
 
             # validation
             if opt.get('val') is not None and (current_iter % opt['val']['val_freq'] == 0):

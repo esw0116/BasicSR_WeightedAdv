@@ -9,7 +9,7 @@ from .srgan_model import SRGANModel
 
 
 @MODEL_REGISTRY.register()
-class ESRGANGradModel(SRGANModel):
+class ESRGANTestGradModel(SRGANModel):
     """ESRGAN model for single image super-resolution."""
 
     def optimize_parameters(self, current_iter):
@@ -75,6 +75,12 @@ class ESRGANGradModel(SRGANModel):
                     loss_dict['l_g_style'] = l_g_style
             # out_recon_grad = autograd.grad(outputs=l_g_total, inputs=self.output, retain_graph=True)[0]
             l_g_total.backward(retain_graph=True)
+            print(len(self.net_g.parameters()))
+            for p in self.net_g.parameters():
+                print(p.grad.norm())
+            # print(self.optimizer_g.param_groups[0].params)
+
+            self.optimizer_g.zero_grad()
             
             # gan loss (relativistic gan)
             real_d_pred = self.net_d(self.gt).detach()
@@ -90,6 +96,8 @@ class ESRGANGradModel(SRGANModel):
             loss_dict['l_g_gan'] = l_g_gan
 
             # l_g_total.backward()
+            if current_iter % 20 == 0:
+                print(out_recon_grad.abs().mean().item(), out_g_grad.abs().mean().item(), out_recon_grad.abs().max().item(), out_g_grad.abs().max().item())
             self.optimizer_g.step()
 
         # optimize net_d

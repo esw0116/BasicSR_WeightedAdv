@@ -48,7 +48,8 @@ class WaveletPairedImageDataset(data.Dataset):
         self.io_backend_opt = opt['io_backend']
         self.mean = opt['mean'] if 'mean' in opt else None
         self.std = opt['std'] if 'std' in opt else None
-        
+        self.normalize_map = opt['normalize'] if 'normalize' in opt else True
+
         if True:
             from nsml import DATASET_PATH
             self.gt_folder, self.lq_folder = os.path.join(DATASET_PATH, opt['dataroot_gt']), os.path.join(DATASET_PATH, opt['dataroot_lq'])
@@ -129,8 +130,9 @@ class WaveletPairedImageDataset(data.Dataset):
             normalize(img_lq, self.mean, self.std, inplace=True)
             normalize(img_gt, self.mean, self.std, inplace=True)
 
-        img_coeff = (img_coeff - min10) / (max10 - min10)
-        img_coeff = img_coeff.clamp(0,1)
+        if self.normalize_map:
+            img_coeff = (img_coeff - min10) / (max10 - min10)
+            img_coeff = img_coeff.clamp(0,1)
         
         # img_coeff = torch.sum(img_coeff.mul(torch.Tensor([65.481/255, 128.553/255, 24.966/255]).reshape(3,1,1)), dim=0) + 16/255
 
