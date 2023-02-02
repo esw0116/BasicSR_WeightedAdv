@@ -138,7 +138,10 @@ def train_pipeline(root_path):
     def nsml_save(filename, **kwargs):
         save_filename = 'G.pth'
         filename_g = os.path.join(filename, save_filename)
-        network = model.get_bare_model(model.net_g)
+        if hasattr(model, 'net_g_ema'):
+            network = model.get_bare_model(model.net_g_ema)
+        else:
+            network = model.get_bare_model(model.net_g)
         state_dict = network.state_dict()
         for key, param in state_dict.items():
             state_dict[key] = param.cpu()
