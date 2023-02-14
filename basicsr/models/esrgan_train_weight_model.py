@@ -2,6 +2,8 @@ import nsml
 from nsml import DATASET_PATH
 import os
 import torch
+from torch import nn
+from torch.nn import functional as F
 from collections import OrderedDict
 
 from archs import build_network
@@ -10,10 +12,11 @@ from utils import get_root_logger
 from utils.registry import MODEL_REGISTRY
 from .sr_model import SRModel
 
+torch.autograd.set_detect_anomaly(True)
 
 @MODEL_REGISTRY.register()
-class SRGANModel(SRModel):
-    """SRGAN model for single image super-resolution."""
+class ESRGANWeightOptModel(SRModel):
+    """ESRGAN model for single image super-resolution."""
 
     def init_training_settings(self):
         train_opt = self.opt['train']
@@ -46,7 +49,9 @@ class SRGANModel(SRModel):
         # define network net_d
         self.net_d = build_network(self.opt['network_d'])
         self.net_d = self.model_to_device(self.net_d)
+        self.print_network(self.net_d)
 
+        # load pretrained models
         load_path = self.opt['path'].get('pretrain_network_d', None)
         if load_path is not None:
             if load_path.startswith('NSML'):
@@ -63,16 +68,19 @@ class SRGANModel(SRModel):
                 print(param_key)
                 self.load_network(self.net_d, load_path, self.opt['path'].get('strict_load_d', True), param_key)
 
-        self.print_network(self.net_d)
+        self.net_w = build_network(self.opt['network_w'])
+        self.net_w = self.model_to_device(self.net_w)
+        self.print_network(self.net_w)
 
         # load pretrained models
-        load_path = self.opt['path'].get('pretrain_network_d', None)
+        load_path = self.opt['path'].get('pretrain_network_w', None)
         if load_path is not None:
-            param_key = self.opt['path'].get('param_key_d', 'params')
-            self.load_network(self.net_d, load_path, self.opt['path'].get('strict_load_d', True), param_key)
+            param_key = self.opt['path'].get('param_key_w', 'params')
+            self.load_network(self.net_w, load_path, self.opt['path'].get('strict_load_w', True), param_key)
 
         self.net_g.train()
         self.net_d.train()
+        self.net_w.train()
 
         # define losses
         if train_opt.get('pixel_opt'):
@@ -104,12 +112,12 @@ class SRGANModel(SRModel):
         train_opt = self.opt['train']
         # optimizer g
         optim_type = train_opt['optim_g'].pop('type')
-        self.optimizer_g = self.get_optimizer(optim_type, self.net_g.parameters(), **train_opt['optim_g'])
+        self.optimizer_g = self.get_optimizer(optim_type, list(self.net_g.parameters()) + list(self.net_w.parameters()), **train_opt['optim_g'])
         self.optimizers.append(self.optimizer_g)
         # optimizer d
-        optim_type = train_opt['optim_d'].pop('type')
-        self.optimizer_d = self.get_optimizer(optim_type, self.net_d.parameters(), **train_opt['optim_d'])
-        self.optimizers.append(self.optimizer_d)
+        # optim_type = train_opt['optim_d'].pop('type')
+        # self.optimizer_d = self.get_optimizer(optim_type, self.net_d.parameters(), **train_opt['optim_d'])
+        # self.optimizers.append(self.optimizer_d)
 
     def optimize_parameters(self, current_iter):
         # optimize net_g
@@ -118,51 +126,84 @@ class SRGANModel(SRModel):
 
         self.optimizer_g.zero_grad()
         self.output = self.net_g(self.lq)
+        # self.pos_weight = self.coeff
+        self.pos_weight = self.net_w(self.coeff)
 
         l_g_total = 0
         loss_dict = OrderedDict()
+        weight_vgg = self.opt['train']['weightgan']['apply_vgg'] if 'apply_vgg' in self.opt['train']['weightgan'] else 0
         if (current_iter % self.net_d_iters == 0 and current_iter > self.net_d_init_iters):
             # pixel loss
             if self.cri_pix:
-                l_g_pix = self.cri_pix(self.output, self.gt)
+                if self.pos_weight is None:
+                    l_g_pix = self.cri_pix(self.output, self.gt)
+                else:
+                    l_g_pix = self.cri_pix(self.output, self.gt, pos_weight=1-weight_vgg*self.pos_weight)
                 l_g_total += l_g_pix
                 loss_dict['l_g_pix'] = l_g_pix
             # perceptual loss
             if self.cri_perceptual:
-                l_g_percep, l_g_style = self.cri_perceptual(self.output, self.gt)
+                l_g_percep, l_g_style = self.cri_perceptual(self.output, self.gt, pos_weight=None)
+                loss_dict['l_g_percep_full'] = l_g_percep
+                l_g_percep, l_g_style = self.cri_perceptual(self.output, self.gt, pos_weight=1-weight_vgg*self.pos_weight)
                 if l_g_percep is not None:
                     l_g_total += l_g_percep
                     loss_dict['l_g_percep'] = l_g_percep
                 if l_g_style is not None:
                     l_g_total += l_g_style
                     loss_dict['l_g_style'] = l_g_style
-            # gan loss
+            # gan loss (relativistic gan)
+            real_d_pred = self.net_d(self.gt).detach()
             fake_g_pred = self.net_d(self.output)
-            l_g_gan = self.cri_gan(fake_g_pred, True, is_disc=False)
+
+            l_g_real = self.cri_gan(real_d_pred - torch.mean(fake_g_pred), False, is_disc=False, pos_weight=self.pos_weight)
+            l_g_fake = self.cri_gan(fake_g_pred - torch.mean(real_d_pred), True, is_disc=False, pos_weight=self.pos_weight)
+            l_g_gan = (l_g_real + l_g_fake) / 2
+
             l_g_total += l_g_gan
             loss_dict['l_g_gan'] = l_g_gan
 
-            l_g_total.backward()
+            l_g_total.backward(retain_graph=True)
             self.optimizer_g.step()
 
         # optimize net_d
-        for p in self.net_d.parameters():
-            p.requires_grad = True
+        # apply_weight_d = self.opt['train']['weightgan']['apply_d'] if 'apply_d' in self.opt['train']['weightgan'] else True
+        # for p in self.net_d.parameters():
+        #     p.requires_grad = True
 
-        self.optimizer_d.zero_grad()
-        # real
-        real_d_pred = self.net_d(self.gt)
-        l_d_real = self.cri_gan(real_d_pred, True, is_disc=True)
-        loss_dict['l_d_real'] = l_d_real
-        loss_dict['out_d_real'] = torch.mean(real_d_pred.detach())
-        l_d_real.backward()
-        # fake
-        fake_d_pred = self.net_d(self.output.detach())
-        l_d_fake = self.cri_gan(fake_d_pred, False, is_disc=True)
-        loss_dict['l_d_fake'] = l_d_fake
-        loss_dict['out_d_fake'] = torch.mean(fake_d_pred.detach())
-        l_d_fake.backward()
-        self.optimizer_d.step()
+        # self.optimizer_d.zero_grad()
+        # # gan loss (relativistic gan)
+
+        # # In order to avoid the error in distributed training:
+        # # "Error detected in CudnnBatchNormBackward: RuntimeError: one of
+        # # the variables needed for gradient computation has been modified by
+        # # an inplace operation",
+        # # we separate the backwards for real and fake, and also detach the
+        # # tensor for calculating mean.
+
+        # # real
+        # fake_d_pred = self.net_d(self.output).detach()
+        # real_d_pred = self.net_d(self.gt)
+        # if apply_weight_d:
+        #     l_d_real = self.cri_gan(real_d_pred - torch.mean(fake_d_pred), True, is_disc=True, pos_weight=self.pos_weight.detach()) * 0.5
+        # else:
+        #     l_d_real = self.cri_gan(real_d_pred - torch.mean(fake_d_pred), True, is_disc=True) * 0.5
+        # l_d_real.backward()
+        # # fake
+        # fake_d_pred = self.net_d(self.output.detach())
+        # if apply_weight_d:
+        #     l_d_fake = self.cri_gan(fake_d_pred - torch.mean(real_d_pred.detach()), False, is_disc=True, pos_weight=self.pos_weight.detach()) * 0.5
+        # else:
+        #     l_d_fake = self.cri_gan(fake_d_pred - torch.mean(real_d_pred.detach()), False, is_disc=True) * 0.5
+        # l_d_fake.backward()
+        # self.optimizer_d.step()
+
+        # loss_dict['l_d_real'] = l_d_real
+        # loss_dict['l_d_fake'] = l_d_fake
+        # loss_dict['out_d_real'] = torch.mean(real_d_pred.detach())
+        # loss_dict['out_d_fake'] = torch.mean(fake_d_pred.detach())
+        loss_dict['original_weight'] = self.coeff.mean()
+        loss_dict['trained_weight'] = self.pos_weight.mean()
 
         self.log_dict = self.reduce_loss_dict(loss_dict)
 
@@ -175,4 +216,5 @@ class SRGANModel(SRModel):
         else:
             self.save_network(self.net_g, 'net_g', current_iter)
         self.save_network(self.net_d, 'net_d', current_iter)
+        self.save_network(self.net_w, 'net_w', current_iter)
         self.save_training_state(epoch, current_iter)

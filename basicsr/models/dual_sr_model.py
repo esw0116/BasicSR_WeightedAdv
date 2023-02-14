@@ -15,11 +15,11 @@ from .base_model import BaseModel
 
 
 @MODEL_REGISTRY.register()
-class SRModel(BaseModel):
+class DualSRModel(BaseModel):
     """Base SR model for single image super-resolution."""
 
     def __init__(self, opt):
-        super(SRModel, self).__init__(opt)
+        super(DualSRModel, self).__init__(opt)
 
         # define network
         self.net_g = build_network(opt['network_g'])
@@ -32,6 +32,12 @@ class SRModel(BaseModel):
             param_g = torch.load(filename_g)
             print('g loaded!!')
             self.net_g.load_state_dict(param_g, strict=self.opt['path'].get('strict_load_g', True))
+
+            save_filename = 'STDG.pth'
+            filename_stdg = os.path.join(filename, save_filename)
+            param_stdg = torch.load(filename_stdg)
+            print('stdg loaded!!')
+            self.net_stdg.load_state_dict(param_stdg, strict=self.opt['path'].get('strict_load_g', True))
 
         # load pretrained models
         load_path = self.opt['path'].get('pretrain_network_g', None)
@@ -49,6 +55,10 @@ class SRModel(BaseModel):
                     param_key = None
                 print(param_key)
                 self.load_network(self.net_g, load_path, self.opt['path'].get('strict_load_g', True), param_key)
+
+        self.net_stdg = build_network(opt['network_stdg'])
+        self.net_stdg = self.model_to_device(self.net_stdg)
+        self.print_network(self.net_stdg)
 
         if self.is_train:
             self.init_training_settings()

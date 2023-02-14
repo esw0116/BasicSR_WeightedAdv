@@ -86,7 +86,8 @@ class Stochastic_RRDBNet(nn.Module):
 
         if self.training:
             if exploit > 1:
-                n = std.new_empty(exploit, *std.shape)
+                # n = std.new_empty(exploit, *std.shape)
+                n = torch.randn((exploit, *std.shape), dtype=std.dtype, layout=std.layout, device=std.device)
                 mean = mean.unsqueeze(0)
                 std = std.unsqueeze(0)
             else:
@@ -95,5 +96,3 @@ class Stochastic_RRDBNet(nn.Module):
             return sample
         else:
             return mean
-
-        return out

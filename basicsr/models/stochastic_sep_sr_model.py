@@ -1,3 +1,4 @@
+from calendar import LocaleHTMLCalendar
 import nsml
 from nsml import DATASET_PATH
 import os
@@ -14,33 +15,43 @@ from utils.registry import MODEL_REGISTRY
 from .base_model import BaseModel
 
 
+# def nsml_load(filename):
+#     save_filename = 'G.pth'
+#     filename_g = os.path.join(filename, save_filename)
+#     print('loaded!!')
+#     param_g = torch.load(filename_g)
+#     print(param_g.keys())
+#     return param_g
+
+# nsml.bind(load=nsml_load)
+
+
 @MODEL_REGISTRY.register()
-class SRModel(BaseModel):
+class StoSepSRModel(BaseModel):
     """Base SR model for single image super-resolution."""
 
     def __init__(self, opt):
-        super(SRModel, self).__init__(opt)
+        super(StoSepSRModel, self).__init__(opt)
 
         # define network
         self.net_g = build_network(opt['network_g'])
         self.net_g = self.model_to_device(self.net_g)
         self.print_network(self.net_g)
 
-        def nsml_load(filename):
+        def nsml_load_g(filename):
             save_filename = 'G.pth'
             filename_g = os.path.join(filename, save_filename)
             param_g = torch.load(filename_g)
             print('g loaded!!')
             self.net_g.load_state_dict(param_g, strict=self.opt['path'].get('strict_load_g', True))
+            # return param_g
 
         # load pretrained models
         load_path = self.opt['path'].get('pretrain_network_g', None)
         if load_path is not None:
             if load_path.startswith('NSML'):
                 print(load_path.split('_')[-1], 'KR80934/CVLAB_SR6/{}'.format(load_path.split('_')[-2]))
-                nsml.load(checkpoint=load_path.split('_')[-1], load_fn=nsml_load, session='KR80934/CVLAB_SR6/{}'.format(load_path.split('_')[-2]))
-                # print(load_net)
-                # self.net_g.load_state_dict(load_net, strict=self.opt['path'].get('strict_load_g', True))
+                nsml.load(checkpoint=load_path.split('_')[-1], load_fn=nsml_load_g, session='KR80934/CVLAB_SR6/{}'.format(load_path.split('_')[-2]))
 
             else:
                 load_path = os.path.join(DATASET_PATH, load_path)
@@ -50,12 +61,40 @@ class SRModel(BaseModel):
                 print(param_key)
                 self.load_network(self.net_g, load_path, self.opt['path'].get('strict_load_g', True), param_key)
 
+        self.net_w = build_network(opt['network_w'])
+        self.net_w = self.model_to_device(self.net_w)
+        self.print_network(self.net_w)
+
+        # load pretrained models
+        load_path = self.opt['path'].get('pretrain_network_w', None)
+        if load_path is not None:
+            if load_path.startswith('NSML'):
+                print(load_path.split('_')[-1], 'KR80934/CVLAB_SR6/{}'.format(load_path.split('_')[-2]))
+                nsml.load(checkpoint=load_path.split('_')[-1], load_fn=nsml_load_g, session='KR80934/CVLAB_SR6/{}'.format(load_path.split('_')[-2]))
+
+            else:
+                load_path = os.path.join(DATASET_PATH, load_path)
+                param_key = self.opt['path'].get('param_key_w', 'params')
+                if param_key == 'None':
+                    param_key = None
+                print(param_key)
+                self.load_network(self.net_g, load_path, self.opt['path'].get('strict_load_w', True), param_key)
+
         if self.is_train:
             self.init_training_settings()
 
     def init_training_settings(self):
         self.net_g.train()
+        self.net_w.train()
         train_opt = self.opt['train']
+
+        def nsml_load_ema(filename):
+            save_filename = 'G.pth'
+            filename_g = os.path.join(filename, save_filename)
+            print('loaded!!')
+            param_g = torch.load(filename_g)
+            print(param_g.keys())
+            self.net_g_ema.load_state_dict(param_g, strict=self.opt['path'].get('strict_load_g', True))
 
         self.ema_decay = train_opt.get('ema_decay', 0)
         if self.ema_decay > 0:
@@ -68,8 +107,12 @@ class SRModel(BaseModel):
             # load pretrained model
             load_path = self.opt['path'].get('pretrain_network_g', None)
             if load_path is not None:
-                load_path = os.path.join(DATASET_PATH, load_path)
-                self.load_network(self.net_g_ema, load_path, self.opt['path'].get('strict_load_g', True), 'params_ema')
+                if load_path.startswith('NSML'):
+                    print(load_path.split('_')[-1], 'KR80934/CVLAB_SR6/{}'.format(load_path.split('_')[-2]))
+                    nsml.load(checkpoint=load_path.split('_')[-1], load_fn=nsml_load_ema, session='KR80934/CVLAB_SR6/{}'.format(load_path.split('_')[-2]))
+                else:
+                    load_path = os.path.join(DATASET_PATH, load_path)
+                    self.load_network(self.net_g_ema, load_path, self.opt['path'].get('strict_load_g', True), 'params_ema')
             else:
                 self.model_ema(0)  # copy net_g weight
             self.net_g_ema.eval()
@@ -79,6 +122,11 @@ class SRModel(BaseModel):
             self.cri_pix = build_loss(train_opt['pixel_opt']).to(self.device)
         else:
             self.cri_pix = None
+
+        if train_opt.get('pixel_opt_w'):
+            self.cri_pix_w = build_loss(train_opt['pixel_opt_w']).to(self.device)
+        else:
+            self.cri_pix_w = None
 
         if train_opt.get('perceptual_opt'):
             self.cri_perceptual = build_loss(train_opt['perceptual_opt']).to(self.device)
@@ -106,6 +154,20 @@ class SRModel(BaseModel):
         self.optimizer_g = self.get_optimizer(optim_type, optim_params, **train_opt['optim_g'])
         self.optimizers.append(self.optimizer_g)
 
+        optim_params = []
+        for k, v in self.net_w.named_parameters():
+            if v.requires_grad:
+                optim_params.append(v)
+            else:
+                logger = get_root_logger()
+                logger.warning(f'Params {k} will not be optimized.')
+
+        optim_type = train_opt['optim_w'].pop('type')
+        self.optimizer_w = self.get_optimizer(optim_type, optim_params, **train_opt['optim_w'])
+        self.optimizers.append(self.optimizer_w)
+        self.exploit = train_opt['forward']['exploit']
+
+
     def feed_data(self, data):
         self.lq = data['lq'].to(self.device)
         if 'gt' in data:
@@ -115,6 +177,7 @@ class SRModel(BaseModel):
 
     def optimize_parameters(self, current_iter):
         self.optimizer_g.zero_grad()
+        # self.output = self.net_g(self.lq, self.exploit)
         self.output = self.net_g(self.lq)
 
         l_total = 0
@@ -137,6 +200,24 @@ class SRModel(BaseModel):
         l_total.backward()
         self.optimizer_g.step()
 
+        self.optimizer_w.zero_grad()
+        self.outputw = self.net_w(self.output.detach(), self.gt, exploit=self.exploit)
+
+        l_total = 0
+        loss_dict = OrderedDict()
+        # pixel loss
+        if self.cri_pix_w:
+            l_pix_w = self.cri_pix_w(self.outputw, self.gt)
+            l_total += l_pix_w
+            loss_dict['l_pix_w'] = l_pix_w
+
+        l_total.backward()
+        self.optimizer_w.step()
+
+        with torch.no_grad():
+            self.pos_weight = self.net_w(self.ouput.detach(), self.gt, get_std=True)
+        loss_dict['trained_weight'] = self.pos_weight.mean()
+
         self.log_dict = self.reduce_loss_dict(loss_dict)
 
         if self.ema_decay > 0:
@@ -144,7 +225,6 @@ class SRModel(BaseModel):
 
     def test(self):
         if hasattr(self, 'net_g_ema'):
-            self.net_g_ema.eval()
             with torch.no_grad():
                 self.output = self.net_g_ema(self.lq)
         else:

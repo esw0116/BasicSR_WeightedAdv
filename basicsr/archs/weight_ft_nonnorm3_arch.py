@@ -31,7 +31,8 @@ class WeightMapNonNorm3FT(nn.Module):
                  num_in_ch=1,
                  num_out_ch=1,
                  num_feat=16,
-                 ndim_norm=1
+                 ndim_norm=1,
+                 avg_weight = 0.25
                  ):
         super(WeightMapNonNorm3FT, self).__init__()
 
@@ -41,6 +42,7 @@ class WeightMapNonNorm3FT(nn.Module):
         self.sig = nn.Sigmoid()
 
         self.ndim_norm = ndim_norm
+        self.avg_weight = avg_weight
 
     def norm(self, w):
         if self.ndim_norm == 1:
@@ -53,7 +55,7 @@ class WeightMapNonNorm3FT(nn.Module):
 
     def sum(self, w):
         height, width = w.shape[2:]
-        w = 0.25 * height * width * w / (w.sum(dim=(2,3), keepdim=True) + 1e-6)
+        w = self.avg_weight * height * width * w / (w.sum(dim=(2,3), keepdim=True) + 1e-6)
         w = w.clip(0, 1)
         return w
 

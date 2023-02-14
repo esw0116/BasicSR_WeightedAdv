@@ -148,6 +148,16 @@ def train_pipeline(root_path):
         print('Save Generator!', filename_g)
         torch.save(state_dict, filename_g)
 
+        if hasattr(model, 'net_d'):
+            save_filename = 'D.pth'
+            filename_d = os.path.join(filename, save_filename)
+            network = model.get_bare_model(model.net_d)
+            state_dict = network.state_dict()
+            for key, param in state_dict.items():
+                state_dict[key] = param.cpu()
+            print('Save Std estimator!', filename_d)
+            torch.save(state_dict, filename_d)
+
         if hasattr(model, 'net_w'):
             save_filename = 'W.pth'
             filename_w = os.path.join(filename, save_filename)

@@ -8,17 +8,17 @@ from archs import build_network
 from losses import build_loss
 from utils import get_root_logger
 from utils.registry import MODEL_REGISTRY
-from .sr_model import SRModel
+from .dual_sr_model import DualSRModel
 
 
 @MODEL_REGISTRY.register()
-class SRGANModel(SRModel):
+class DualSRGANModel(DualSRModel):
     """SRGAN model for single image super-resolution."""
 
     def init_training_settings(self):
         train_opt = self.opt['train']
 
-        def nsml_load(filename):
+        def nsml_load_d(filename):
             save_filename = 'D.pth'
             filename_d = os.path.join(filename, save_filename)
             param_d = torch.load(filename_d)
@@ -43,6 +43,23 @@ class SRGANModel(SRModel):
                 self.model_ema(0)  # copy net_g weight
             self.net_g_ema.eval()
 
+        if self.ema_decay > 0:
+            logger = get_root_logger()
+            logger.info(f'Use Exponential Moving Average with decay: {self.ema_decay}')
+            # define network net_g with Exponential Moving Average (EMA)
+            # net_g_ema is used only for testing on one GPU and saving
+            # There is no need to wrap with DistributedDataParallel
+            self.net_stdg_ema = build_network(self.opt['network_stdg']).to(self.device)
+            # load pretrained model
+            load_path = self.opt['path'].get('pretrain_network_stdg', None)
+            print(load_path)
+            if load_path is not None:
+                load_path = os.path.join(DATASET_PATH, load_path)
+                self.load_network(self.net_stdg_ema, load_path, self.opt['path'].get('strict_load_stdg', True), 'params_ema')
+            else:
+                self.model_ema(0)  # copy net_g weight
+            self.net_stdg_ema.eval()
+
         # define network net_d
         self.net_d = build_network(self.opt['network_d'])
         self.net_d = self.model_to_device(self.net_d)
@@ -51,7 +68,7 @@ class SRGANModel(SRModel):
         if load_path is not None:
             if load_path.startswith('NSML'):
                 print(load_path.split('_')[-1], 'KR80934/CVLAB_SR6/{}'.format(load_path.split('_')[-2]))
-                nsml.load(checkpoint=load_path.split('_')[-1], load_fn=nsml_load, session='KR80934/CVLAB_SR6/{}'.format(load_path.split('_')[-2]))
+                nsml.load(checkpoint=load_path.split('_')[-1], load_fn=nsml_load_d, session='KR80934/CVLAB_SR6/{}'.format(load_path.split('_')[-2]))
                 # print(load_net)
                 # self.net_g.load_state_dict(load_net, strict=self.opt['path'].get('strict_load_g', True))
 

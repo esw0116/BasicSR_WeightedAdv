@@ -51,7 +51,7 @@ network_g:
 
 # path
 path:
-  pretrain_network_g: NSML_316_20000
+  pretrain_network_g: train/pretrained_models/RRDB_PSNR_x4.pth
   strict_load_g: false
   resume_state: ~
 
@@ -96,7 +96,7 @@ val:
 # logging settings
 logger:
   print_freq: 2500
-  save_checkpoint_freq: !!float 1e4
+  save_checkpoint_freq: !!float 2e4
   use_tb_logger: false
   wandb:
     project: ~

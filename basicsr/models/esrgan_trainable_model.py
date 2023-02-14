@@ -183,6 +183,9 @@ class ESRGANTrainModel(SRModel):
         loss_dict['out_d_real'] = torch.mean(real_d_pred.detach())
         loss_dict['out_d_fake'] = torch.mean(fake_d_pred.detach())
 
+        loss_dict['original_weight'] = self.coeff.mean()
+        loss_dict['trained_weight'] = self.pos_weight.mean()
+
         self.log_dict = self.reduce_loss_dict(loss_dict)
 
         if self.ema_decay > 0:
