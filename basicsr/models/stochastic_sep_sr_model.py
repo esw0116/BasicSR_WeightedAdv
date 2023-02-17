@@ -215,7 +215,7 @@ class StoSepSRModel(BaseModel):
         self.optimizer_w.step()
 
         with torch.no_grad():
-            self.pos_weight = self.net_w(self.ouput.detach(), self.gt, get_std=True)
+            self.pos_weight = self.net_w(self.output.detach(), self.gt, get_std=True)
         loss_dict['trained_weight'] = self.pos_weight.mean()
 
         self.log_dict = self.reduce_loss_dict(loss_dict)

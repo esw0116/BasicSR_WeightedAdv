@@ -24,7 +24,7 @@ class StoSepESRGANModel(StoSepSRGANModel):
         self.output = self.net_g(self.lq)
 
         with torch.no_grad():
-            self.pos_weight = self.net_w(self.ouput.detach(), self.gt, get_std=True)
+            self.pos_weight = self.net_w(self.output.detach(), self.gt, get_std=True)
             self.pos_weight = self.pos_weight.mean(dim=1, keepdim=True)
 
         l_g_total = 0
@@ -82,7 +82,7 @@ class StoSepESRGANModel(StoSepSRGANModel):
             p.requires_grad = True
 
         with torch.no_grad():
-            self.pos_weight = self.net_w(self.ouput.detach(), self.gt, get_std=True)
+            self.pos_weight = self.net_w(self.output.detach(), self.gt, get_std=True)
             self.pos_weight = self.pos_weight.mean(dim=1, keepdim=True)
         
         self.optimizer_d.zero_grad()
