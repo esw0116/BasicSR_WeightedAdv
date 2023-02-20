@@ -1,7 +1,7 @@
 # ignored folders
-datasets/*
-experiments/*
-results/*
+datasets
+experiments
+results
 tb_logger/*
 wandb/*
 tmp/*
@@ -132,3 +132,4 @@ venv.bak/
 .mypy_cache/
 
 dataset
+nsml_models

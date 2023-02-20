@@ -10,6 +10,7 @@ datasets:
     type: PairedImageDataset
     dataroot_gt: dataset/benchmark/Set5/HR
     dataroot_lq: dataset/benchmark/Set5/LR_bicubic/X4
+    filename_tmpl: '{}x4'
     io_backend:
       type: disk
   test_2:  # the 2nd test dataset
@@ -17,9 +18,25 @@ datasets:
     type: PairedImageDataset
     dataroot_gt: dataset/benchmark/Set14/HR
     dataroot_lq: dataset/benchmark/Set14/LR_bicubic/X4
+    filename_tmpl: '{}x4'
     io_backend:
       type: disk
-
+  test_3:  # the 2nd test dataset
+    name: B100
+    type: PairedImageDataset
+    dataroot_gt: dataset/benchmark/B100/HR
+    dataroot_lq: dataset/benchmark/B100/LR_bicubic/X4
+    filename_tmpl: '{}x4'
+    io_backend:
+      type: disk
+  test_4:  # the 2nd test dataset
+    name: Urban100
+    type: PairedImageDataset
+    dataroot_gt: dataset/benchmark/Urban100/HR
+    dataroot_lq: dataset/benchmark/Urban100/LR_bicubic/X4
+    filename_tmpl: '{}x4'
+    io_backend:
+      type: disk
   # test_3:
   #   name: DIV2K100
   #   type: PairedImageDataset
@@ -40,7 +57,7 @@ network_g:
 
 # path
 path:
-  pretrain_network_g: experiments/pretrained_models/ESRGAN/ESRGAN_PSNR_SRx4_DF2K_official-150ff491.pth
+  pretrain_network_g: pretrained_models/ESRGAN_PSNR_SRx4_DF2K_official-150ff491.pth
   strict_load_g: true
 
 # validation settings
@@ -52,8 +69,11 @@ val:
     psnr: # metric name, can be arbitrary
       type: calculate_psnr
       crop_border: 4
-      test_y_channel: false
+      test_y_channel: true
     ssim:
       type: calculate_ssim
       crop_border: 4
-      test_y_channel: false
+      test_y_channel: true
+    niqe:
+      type: calculate_niqe
+      crop_border: 4

@@ -17,17 +17,40 @@ class ESRGANModel(SRGANModel):
         self.optimizer_g.zero_grad()
         self.output = self.net_g(self.lq)
 
+        if hasattr(self, 'coeff'):
+            self.pos_weight = self.coeff
+            norm_quantile = self.opt['train']['weightgan']['quantile']
+            gamma = self.opt['train']['weightgan']['gamma']
+
+            # Normalize (low 10% -> 0, high 10% -> 1)
+            b, c, h, w = self.pos_weight.shape
+            self.pos_weight = self.pos_weight.reshape(b, c, h*w)
+            low10 = torch.quantile(self.pos_weight, norm_quantile, dim=2, keepdim=True)
+            hi10 =  torch.quantile(self.pos_weight, 1-norm_quantile, dim=2, keepdim=True)
+            self.pos_weight = (self.pos_weight -low10) / (hi10 - low10)
+            self.pos_weight = self.pos_weight.clamp(0, 1)
+            self.pos_weight = self.pos_weight.reshape(b,c,h,w)
+
+            # Add non-linearity
+            self.pos_weight = torch.pow(self.pos_weight, gamma)
+            breakpoint()
+        else:
+            self.pos_weight = None
+
         l_g_total = 0
         loss_dict = OrderedDict()
         if (current_iter % self.net_d_iters == 0 and current_iter > self.net_d_init_iters):
             # pixel loss
             if self.cri_pix:
-                l_g_pix = self.cri_pix(self.output, self.gt)
+                if self.pos_weight is None:
+                    l_g_pix = self.cri_pix(self.output, self.gt)
+                else:
+                    l_g_pix = self.cri_pix(self.output, self.gt, pos_weight=1-0.01*self.pos_weight)
                 l_g_total += l_g_pix
                 loss_dict['l_g_pix'] = l_g_pix
             # perceptual loss
             if self.cri_perceptual:
-                l_g_percep, l_g_style = self.cri_perceptual(self.output, self.gt)
+                l_g_percep, l_g_style = self.cri_perceptual(self.output, self.gt, pos_weight=self.pos_weight)
                 if l_g_percep is not None:
                     l_g_total += l_g_percep
                     loss_dict['l_g_percep'] = l_g_percep
@@ -37,12 +60,9 @@ class ESRGANModel(SRGANModel):
             # gan loss (relativistic gan)
             real_d_pred = self.net_d(self.gt).detach()
             fake_g_pred = self.net_d(self.output)
-            if hasattr(self, 'coeff'):
-                pos_weight = self.coeff
-            else:
-                pos_weight = None
-            l_g_real = self.cri_gan(real_d_pred - torch.mean(fake_g_pred), False, is_disc=False, pos_weight=pos_weight)
-            l_g_fake = self.cri_gan(fake_g_pred - torch.mean(real_d_pred), True, is_disc=False, pos_weight=pos_weight)
+
+            l_g_real = self.cri_gan(real_d_pred - torch.mean(fake_g_pred), False, is_disc=False, pos_weight=self.pos_weight)
+            l_g_fake = self.cri_gan(fake_g_pred - torch.mean(real_d_pred), True, is_disc=False, pos_weight=self.pos_weight)
             l_g_gan = (l_g_real + l_g_fake) / 2
 
             l_g_total += l_g_gan

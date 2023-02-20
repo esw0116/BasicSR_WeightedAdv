@@ -1,0 +1,80 @@
+name: ESRGAN_SRx4_Wavelet_5e-4
+model_type: ESRGANModel
+scale: 4
+num_gpu: 1  # set num_gpu: 0 for cpu mode
+manual_seed: 0
+
+datasets:
+  test_1:  # the 1st test dataset
+    name: Set5
+    type: PairedImageDataset
+    dataroot_gt: dataset/benchmark/Set5/HR
+    dataroot_lq: dataset/benchmark/Set5/LR_bicubic/X4
+    filename_tmpl: '{}x4'
+    io_backend:
+      type: disk
+  test_2:  # the 2nd test dataset
+    name: Set14
+    type: PairedImageDataset
+    dataroot_gt: dataset/benchmark/Set14/HR
+    dataroot_lq: dataset/benchmark/Set14/LR_bicubic/X4
+    filename_tmpl: '{}x4'
+    io_backend:
+      type: disk
+  test_3:  # the 2nd test dataset
+    name: B100
+    type: PairedImageDataset
+    dataroot_gt: dataset/benchmark/B100/HR
+    dataroot_lq: dataset/benchmark/B100/LR_bicubic/X4
+    filename_tmpl: '{}x4'
+    io_backend:
+      type: disk
+  test_4:  # the 2nd test dataset
+    name: Urban100
+    type: PairedImageDataset
+    dataroot_gt: dataset/benchmark/Urban100/HR
+    dataroot_lq: dataset/benchmark/Urban100/LR_bicubic/X4
+    filename_tmpl: '{}x4'
+    io_backend:
+      type: disk
+  # test_4:
+  #   name: DIV2K100
+  #   type: PairedImageDataset
+  #   dataroot_gt: dataset/DIV2K/DIV2K_valid_HR
+  #   dataroot_lq: dataset/DIV2K/DIV2K_valid_LR_bicubic/X4
+  #   filename_tmpl: '{}x4'
+  #   io_backend:
+  #     type: disk
+
+# network structures
+network_g:
+  type: MyRRDBNet
+  num_in_ch: 3
+  num_out_ch: 3
+  num_feat: 64
+  num_block: 23
+  num_grow_ch: 32
+
+# path
+path:
+  pretrain_network_g: nsml_models/KR80934_CVLAB_SR5_59/200000/model/G.pth
+  strict_load_g: true
+  param_key_g: ~
+
+# validation settings
+val:
+  save_img: true
+  suffix: ~  # add suffix to saved images, if None, use exp name
+
+  metrics:
+    psnr: # metric name, can be arbitrary
+      type: calculate_psnr
+      crop_border: 4
+      test_y_channel: true
+    ssim:
+      type: calculate_ssim
+      crop_border: 4
+      test_y_channel: true
+    niqe:
+      type: calculate_niqe
+      crop_border: 4

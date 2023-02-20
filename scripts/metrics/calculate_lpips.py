@@ -1,3 +1,5 @@
+import argparse
+
 import cv2
 import glob
 import numpy as np
@@ -12,19 +14,24 @@ except ImportError:
     print('Please install lpips: pip install lpips')
 
 
-def main():
+def main(dataset, network):
+    # dataset = args.dataset
+    folder_gt = './dataset/benchmark/{}/HR'.format(dataset)
+    folder_restored = './results/{}/visualization/{}'.format(network, dataset)
+
     # Configurations
     # -------------------------------------------------------------------------
-    dataset = 'Urban100'
-    folder_gt = './dataset/benchmark/{}/HR'.format(dataset)
-    folder_restored = './results/ESRGAN_SRx4_Weight_5e-3_sqrt_140000/visualization/{}'.format(dataset)
+    # dataset = 'Urban100'
+    # folder_gt = './dataset/benchmark/{}/HR'.format(dataset)
+    # folder_restored = './results/ESRGAN_SRx4_Weight_5e-3_sqrt_140000/visualization/{}'.format(dataset)
     # folder_restored = './results/ESRGAN_SRx4_DF2KOST_WeightedGAN/visualization/{}'.format(dataset)
     # folder_restored = './results/ESRGAN_SRx4_DF2KOST_BaseGAN/visualization/{}'.format(dataset)
     # folder_restored = './results/ESRGAN_SRx4_DF2KOST_official/visualization/{}'.format(dataset)
     # crop_border = 4
     suffix = ''
     # -------------------------------------------------------------------------
-    loss_fn_vgg = lpips.LPIPS(net='vgg').cuda()  # RGB, normalized to [-1,1]
+
+    loss_fn_vgg = lpips.LPIPS(net='alex').cuda()  # RGB, normalized to [-1,1]
     lpips_all = []
     img_gt_list = sorted(glob.glob(osp.join(folder_gt, '*')))
     img_sr_list = sorted(glob.glob(osp.join(folder_restored, '*')))
@@ -56,8 +63,19 @@ def main():
         # print(f'{i+1:3d}: {basename:25}. \tLPIPS: {lpips_val:.6f}.')
         lpips_all.append(lpips_val)
 
-    print(f'Average: LPIPS: {sum(lpips_all) / len(lpips_all):.6f}')
+    print(f'\t{dataset}, \t{network}')
+    print(f'\tAverage: LPIPS: {sum(lpips_all) / len(lpips_all):.6f}')
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset', '-d', choices=['Set5', 'Set14', 'B100', 'Urban100', 'all'], required=True, help='Dataset type')
+    parser.add_argument('--network', '-n', type=str, help='model to test')
+    args = parser.parse_args()
+
+    if args.dataset == 'all':
+        dataset_list = ['Set5', 'Set14', 'B100', 'Urban100']
+        for d in dataset_list:
+            main(d, args.network)
+    else:
+        main(args.dataset, args.network)

@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import torch
 from torch.utils import data as data
 from torchvision.transforms.functional import normalize, to_grayscale
@@ -46,7 +47,7 @@ class WeightPairedImageDataset(data.Dataset):
         self.mean = opt['mean'] if 'mean' in opt else None
         self.std = opt['std'] if 'std' in opt else None
         
-        if opt.use_nseml:
+        if False: # opt.use_nsml:
             from nsml import DATASET_PATH
             self.gt_folder, self.lq_folder, self.weight_folder = os.path.join(DATASET_PATH, opt['dataroot_gt']), os.path.join(DATASET_PATH, opt['dataroot_lq']), os.path.join(DATASET_PATH, opt['dataroot_weight'])
         else:
@@ -85,6 +86,7 @@ class WeightPairedImageDataset(data.Dataset):
         weight_path = self.paths[index]['weight_path']
         img_bytes = self.file_client.get(weight_path, 'weight')
         img_coeff = imfrombytes(img_bytes, float32=True)
+        img_coeff = np.sum(img_coeff * (np.array([65.481/255, 128.553/255, 24.966/255]).reshape(1,1,3)), axis=2, keepdims=True) + 16/255
         
         # augmentation for training
         if self.opt['phase'] == 'train':
@@ -112,7 +114,7 @@ class WeightPairedImageDataset(data.Dataset):
             normalize(img_lq, self.mean, self.std, inplace=True)
             normalize(img_gt, self.mean, self.std, inplace=True)
         
-        img_coeff = torch.mean(img_coeff.mul(torch.Tensor([65.481/255, 128.553/255, 24.966/255]).reshape(3,1,1)), dim=0) + 16/255
+        # img_coeff = torch.sum(img_coeff.mul(torch.Tensor([65.481/255, 128.553/255, 24.966/255]).reshape(3,1,1)), dim=0) + 16/255
 
         return {'lq': img_lq, 'gt': img_gt, 'coeff': img_coeff, 'lq_path': lq_path, 'gt_path': gt_path}
 
