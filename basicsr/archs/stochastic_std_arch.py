@@ -31,6 +31,7 @@ class StoStdEstimator(nn.Module):
                  num_in_ch=1,
                  num_out_ch=1,
                  num_feat=16,
+                 rand_std = 1,
                  ):
         super(StoStdEstimator, self).__init__()
 
@@ -38,7 +39,8 @@ class StoStdEstimator(nn.Module):
         self.conv2 = nn.Sequential(nn.Conv2d(num_feat, num_feat, 3, 1, 1), nn.ReLU())
         self.conv3 = nn.Sequential(nn.Conv2d(num_feat, num_feat, 3, 1, 1), nn.ReLU())
         self.conv4 = nn.Conv2d(num_feat, num_out_ch, 3, 1, 1)
-
+        self.rand_std = rand_std
+        
     def forward(self, sr, gt, exploit=1, get_std=False):
         res = sr - gt
         std = torch.cat((sr, res), dim=1)
@@ -47,6 +49,8 @@ class StoStdEstimator(nn.Module):
         std = self.conv3(std)
         std = self.conv4(std)
 
+        std = std.abs()
+
         if get_std:
             return std
         
@@ -54,6 +58,7 @@ class StoStdEstimator(nn.Module):
             if exploit > 1:
                 # n = std.new_empty(exploit, *std.shape)
                 n = torch.randn((exploit, *std.shape), dtype=std.dtype, layout=std.layout, device=std.device)
+                n = n * self.rand_std
                 mean = sr.unsqueeze(0)
                 std = std.unsqueeze(0)
             else:

@@ -27,6 +27,9 @@ class StoSepESRGANModel(StoSepSRGANModel):
             self.pos_weight = self.net_w(self.output.detach(), self.gt, get_std=True)
             self.pos_weight = self.pos_weight.mean(dim=1, keepdim=True)
 
+        pos_coeff = self.opt['train']['weightgan']['pos_coeff'] if 'pos_coeff' in self.opt['train']['weightgan'] else 1
+        self.pos_weight = self.pos_weight * pos_coeff
+
         l_g_total = 0
         loss_dict = OrderedDict()
         weight_vgg = self.opt['train']['weightgan']['apply_vgg'] if 'apply_vgg' in self.opt['train']['weightgan'] else 0
@@ -59,31 +62,14 @@ class StoSepESRGANModel(StoSepSRGANModel):
             l_g_total.backward()
             self.optimizer_g.step()
 
-            # Net_W
-            self.optimizer_w.zero_grad()
-            self.outputw = self.net_w(self.output.detach(), self.gt, exploit=self.exploit)
-
-            l_w_total = 0
-            loss_dict = OrderedDict()
-            # pixel loss
-            if self.cri_pix_w:
-                l_pix_w = self.cri_pix_w(self.outputw, self.gt)
-                l_w_total += l_pix_w
-                loss_dict['l_pix_w'] = l_pix_w
-
-            l_w_total.backward()
-            self.optimizer_w.step()
-
-        loss_dict['trained_weight'] = self.pos_weight.mean()
-
         # optimize net_d
         apply_weight_d = self.opt['train']['weightgan']['apply_d'] if 'apply_d' in self.opt['train']['weightgan'] else True
         for p in self.net_d.parameters():
             p.requires_grad = True
 
-        with torch.no_grad():
-            self.pos_weight = self.net_w(self.output.detach(), self.gt, get_std=True)
-            self.pos_weight = self.pos_weight.mean(dim=1, keepdim=True)
+        # with torch.no_grad():
+        #     self.pos_weight = self.net_w(self.output.detach(), self.gt, get_std=True)
+        #     self.pos_weight = self.pos_weight.mean(dim=1, keepdim=True)
         
         self.optimizer_d.zero_grad()
 
@@ -107,6 +93,20 @@ class StoSepESRGANModel(StoSepSRGANModel):
         loss_dict['l_d_fake'] = l_d_fake
         loss_dict['out_d_real'] = torch.mean(real_d_pred.detach())
         loss_dict['out_d_fake'] = torch.mean(fake_d_pred.detach())
+        loss_dict['trained_weight'] = self.pos_weight.mean()
+
+        # optimize net_w
+        self.optimizer_w.zero_grad()
+        self.outputw = self.net_w(self.output.detach(), self.gt, exploit=self.exploit)
+        l_w_total = 0
+        # pixel loss
+        if self.cri_pix_w:
+            l_pix_w = self.cri_pix_w(self.outputw, self.gt)
+            l_w_total += l_pix_w
+            loss_dict['l_pix_w'] = l_pix_w
+
+        l_w_total.backward()
+        self.optimizer_w.step()
 
         self.log_dict = self.reduce_loss_dict(loss_dict)
         if self.ema_decay > 0:

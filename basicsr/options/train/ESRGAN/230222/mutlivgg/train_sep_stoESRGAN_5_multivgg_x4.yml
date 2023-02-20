@@ -55,6 +55,7 @@ network_w:
   type: StoStdEstimator
   num_in_ch: 3
   num_out_ch: 3
+  rand_std: 1
 
 network_d:
   type: UNetDiscriminatorSN
@@ -99,10 +100,9 @@ train:
   warmup_iter: -1  # no warm up
 
   weightgan:
-    quantile: 0
-    gamma: 1
-    apply_d: true
+    apply_d: false
     apply_vgg: 0
+    pos_coeff: 2
 
   # losses
   pixel_opt:
@@ -118,7 +118,12 @@ train:
   perceptual_opt:
     type: PerceptualLoss
     layer_weights:
+      'conv1_2': 0.1
+      'conv2_2': 0.1
+      'conv3_4': 1
+      'conv4_4': 1
       'conv5_4': 1  # before relu
+    vgg_type: vgg19
     vgg_type: vgg19
     use_input_norm: true
     range_norm: false

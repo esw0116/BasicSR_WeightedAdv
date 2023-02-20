@@ -130,7 +130,8 @@ class Stochastic_MMRRDBNet(nn.Module):
         # Multimodal sampling
         b, _, h, w = out.size()
         out = out.view(b, self.n_mods, -1, h, w)
-        logits, means, stds = x.split((1, self.n_colors, self.n_colors), dim=2)
+        # print(x.shape, out.shape)
+        logits, means, stds = out.split((1, self.n_colors, self.n_colors), dim=2)
         stds = stds.abs()
         # Check here:
         # 1) Do we need to return sampled SR results? or a single SR result?

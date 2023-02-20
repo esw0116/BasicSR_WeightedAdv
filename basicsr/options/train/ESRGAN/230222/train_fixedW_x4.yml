@@ -78,7 +78,7 @@ train:
 
   scheduler:
     type: MultiStepLR
-    milestones: [300000, 300000]
+    milestones: [300000]
     gamma: 1
 
   total_iter: 300000
@@ -88,7 +88,7 @@ train:
     quantile: 0
     gamma: 1
     apply_vgg: 0
-    apply_d: true
+    apply_d: false
 
   # losses
   pixel_opt:

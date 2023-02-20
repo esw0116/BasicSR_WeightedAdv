@@ -17,7 +17,17 @@ class StoMMESRGANModel(StoSRGANModel):
             p.requires_grad = False
 
         self.optimizer_g.zero_grad()
-        self.output, self.std_weights, self.dist_weights = self.net_g(self.lq, get_stat=True)
+        self.output, std_weights, dist_weights = self.net_g(self.lq, get_stat=True)
+
+        use_pos = self.opt['train']['weightgan']['use_pos']
+
+        if use_pos == 'std':
+            self.pos_weight = std_weights
+        elif use_pos == 'dist':
+            self.pos_weight = dist_weights
+        elif use_pos == 'mindist':
+            self.pos_weight = 1 - dist_weights
+        self.pos_weight = self.pos_weight.mean(dim=1, keepdims=True)
 
         l_g_total = 0
         loss_dict = OrderedDict()
@@ -90,6 +100,8 @@ class StoMMESRGANModel(StoSRGANModel):
         loss_dict['l_d_fake'] = l_d_fake
         loss_dict['out_d_real'] = torch.mean(real_d_pred.detach())
         loss_dict['out_d_fake'] = torch.mean(fake_d_pred.detach())
+
+        loss_dict['weight_average'] = torch.mean(self.pos_weight)
 
         self.log_dict = self.reduce_loss_dict(loss_dict)
 

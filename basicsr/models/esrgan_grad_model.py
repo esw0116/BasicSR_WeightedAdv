@@ -22,7 +22,6 @@ class ESRGANGradModel(SRGANModel):
 
         if hasattr(self, 'coeff'):
             self.pos_weight = self.coeff
-            norm_quantile = self.opt['train']['weightgan']['quantile']
             gamma = self.opt['train']['weightgan']['gamma']
 
             map_process = self.opt['train']['weightgan']['blur'] if 'blur' in self.opt['train']['weightgan'] else None

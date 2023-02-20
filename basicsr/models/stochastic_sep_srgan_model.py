@@ -107,6 +107,9 @@ class StoSepSRGANModel(StoSepSRModel):
         self.optimizer_d = self.get_optimizer(optim_type, self.net_d.parameters(), **train_opt['optim_d'])
         self.optimizers.append(self.optimizer_d)
 
+        self.exploit = train_opt['forward']['exploit']
+
+
     def optimize_parameters(self, current_iter):
         # optimize net_g
         for p in self.net_d.parameters():
