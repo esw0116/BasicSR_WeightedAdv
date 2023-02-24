@@ -166,9 +166,10 @@ class UNetDiscriminatorSN(nn.Module):
         skip_connection (bool): Whether to use skip connections between U-Net. Default: True.
     """
 
-    def __init__(self, num_in_ch, num_feat=64, skip_connection=True):
+    def __init__(self, num_in_ch, num_feat=64, skip_connection=True, encoder_loss=False):
         super(UNetDiscriminatorSN, self).__init__()
         self.skip_connection = skip_connection
+        self.encoder_loss = encoder_loss
         norm = spectral_norm
         # the first convolution
         self.conv0 = nn.Conv2d(num_in_ch, num_feat, kernel_size=3, stride=1, padding=1)
@@ -191,7 +192,7 @@ class UNetDiscriminatorSN(nn.Module):
         x1 = F.leaky_relu(self.conv1(x0), negative_slope=0.2, inplace=True)
         x2 = F.leaky_relu(self.conv2(x1), negative_slope=0.2, inplace=True)
         x3 = F.leaky_relu(self.conv3(x2), negative_slope=0.2, inplace=True)
-
+        enc = x3
         # upsample
         x3 = F.interpolate(x3, scale_factor=2, mode='bilinear', align_corners=False)
         x4 = F.leaky_relu(self.conv4(x3), negative_slope=0.2, inplace=True)
@@ -214,4 +215,6 @@ class UNetDiscriminatorSN(nn.Module):
         out = F.leaky_relu(self.conv8(out), negative_slope=0.2, inplace=True)
         out = self.conv9(out)
 
+        if self.encoder_loss:
+            return out, enc
         return out

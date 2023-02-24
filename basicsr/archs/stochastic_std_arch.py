@@ -48,7 +48,6 @@ class StoStdEstimator(nn.Module):
         std = self.conv2(std)
         std = self.conv3(std)
         std = self.conv4(std)
-
         std = std.abs()
 
         if get_std:

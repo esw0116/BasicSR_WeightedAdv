@@ -46,7 +46,7 @@ class WeightPairedImageDataset(data.Dataset):
         self.io_backend_opt = opt['io_backend']
         self.mean = opt['mean'] if 'mean' in opt else None
         self.std = opt['std'] if 'std' in opt else None
-        self.normalize_map = opt['normalize'] if 'normalize' in opt else True
+        self.normalize_map = opt['normalize'] if 'normalize' in opt else False
         
         if True:
             from nsml import DATASET_PATH
