@@ -1,0 +1,144 @@
+# general settings
+name: train_SwinIR_SRx4_scratch_P48W8_DIV2K_500k_B4G8
+model_type: SwinIRModel
+scale: 4
+num_gpu: 4
+manual_seed: 0
+
+# dataset and data loader settings
+datasets:
+  train:
+    name: DIV2K
+    type: PyPairedImageDataset
+    dataroot_gt: train/DIV2K/bin/DIV2K_train_HR
+    dataroot_lq: train/DIV2K/bin/DIV2K_train_LR_bicubic/X4
+    filename_tmpl: '{}x4'
+    io_backend:
+      type: disk
+
+    gt_size: 192
+    use_hflip: true
+    use_rot: true
+
+    # data loader
+    num_worker_per_gpu: 6
+    batch_size_per_gpu: 8
+    dataset_enlarge_ratio: 100
+    prefetch_mode: ~
+
+  val:
+    name: Set14
+    type: PairedImageDataset
+    dataroot_gt: train/benchmark/Set14/HR
+    dataroot_lq: train/benchmark/Set14/LR_bicubic/X4
+    filename_tmpl: '{}x4'
+    dataroot_weight: 
+    io_backend:
+      type: disk
+
+# network structures
+network_g:
+  type: SwinIR
+  upscale: 4
+  in_chans: 3
+  img_size: 48
+  window_size: 8
+  img_range: 1.
+  depths: [6, 6, 6, 6, 6, 6]
+  embed_dim: 180
+  num_heads: [6, 6, 6, 6, 6, 6]
+  mlp_ratio: 2
+  upsampler: 'pixelshuffle'
+  resi_connection: '1conv'
+
+network_d:
+  type: VGGStyleDiscriminator192
+  num_in_ch: 3
+  num_feat: 64
+
+# path
+path:
+  pretrain_network_g: train/pretrained_models/SwinIR_M_DIV2K_x4.pth
+  strict_load_g: true
+  resume_state: ~
+
+# training settings
+train:
+  ema_decay: 0.999
+  optim_g:
+    type: Adam
+    lr: !!float 1e-4
+    weight_decay: 0
+    betas: [0.9, 0.99]
+  optim_d:
+    type: Adam
+    lr: !!float 1e-4
+    weight_decay: 0
+    betas: [0.9, 0.99]
+  
+  scheduler:
+    type: MultiStepLR
+    milestones: [250000, 400000, 450000, 475000]
+    gamma: 0.5
+
+  total_iter: 500000
+  warmup_iter: -1  # no warm up
+
+  # losses
+  pixel_opt:
+    type: L1Loss
+    loss_weight: 1.0
+    reduction: mean
+  perceptual_opt:
+    type: PerceptualLoss
+    layer_weights:
+      'conv1_2': 0.1
+      'conv2_2': 0.1
+      'conv3_4': 1
+      'conv4_4': 1
+      'conv5_4': 1  # before relu
+    vgg_type: vgg19
+    use_input_norm: true
+    range_norm: false
+    perceptual_weight: 1.0
+    style_weight: 0
+    criterion: l1
+  gan_opt:
+    type: GANLoss
+    gan_type: vanilla
+    real_label_val: 1.0
+    fake_label_val: 0.0
+    loss_weight: !!float 5e-3
+
+# validation settings
+val:
+  val_freq: !!float 2.5e3
+  save_img: false
+
+  metrics:
+    psnr: # metric name, can be arbitrary
+      type: calculate_psnr
+      crop_border: 4
+      test_y_channel: false
+    ssim:
+      type: calculate_ssim
+      crop_border: 4
+      test_y_channel: true
+    niqe:
+      type: calculate_niqe
+      crop_border: 4
+      better: lower
+
+# logging settings
+logger:
+  print_freq: 1000
+  save_checkpoint_freq: !!float 1e4
+  use_tb_logger: false
+  wandb:
+    project: ~
+    resume_id: ~
+
+# dist training settings
+dist_params:
+  backend: nccl
+  port: 29500
