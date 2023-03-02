@@ -74,14 +74,14 @@ def paired_random_crop(img_gts, img_lqs, gt_patch_size, scale, gt_path=None):
 
     # crop lq patch
     if input_type == 'Tensor':
-        img_lqs = [v[:, :, top:top + lq_patch_size, left:left + lq_patch_size] for v in img_lqs]
+        img_lqs = [v[..., top:top + lq_patch_size, left:left + lq_patch_size] for v in img_lqs]
     else:
         img_lqs = [v[top:top + lq_patch_size, left:left + lq_patch_size, ...] for v in img_lqs]
 
     # crop corresponding gt patch
     top_gt, left_gt = int(top * scale), int(left * scale)
     if input_type == 'Tensor':
-        img_gts = [v[:, :, top_gt:top_gt + gt_patch_size, left_gt:left_gt + gt_patch_size] for v in img_gts]
+        img_gts = [v[..., top_gt:top_gt + gt_patch_size, left_gt:left_gt + gt_patch_size] for v in img_gts]
     else:
         img_gts = [v[top_gt:top_gt + gt_patch_size, left_gt:left_gt + gt_patch_size, ...] for v in img_gts]
     if len(img_gts) == 1:
@@ -157,6 +157,53 @@ def augment(imgs, hflip=True, rotation=True, flows=None, return_status=False):
         else:
             return imgs
 
+def pyaugment(imgs, hflip=True, rotation=True, return_status=False):
+    """Augment: horizontal flips OR rotate (0, 90, 180, 270 degrees).
+
+    We use vertical flip and transpose for rotation implementation.
+    All the images in the list use the same augmentation.
+
+    Args:
+        imgs (list[ndarray] | ndarray): Images to be augmented. If the input
+            is an ndarray, it will be transformed to a list.
+        hflip (bool): Horizontal flip. Default: True.
+        rotation (bool): Ratotation. Default: True.
+        flows (list[ndarray]: Flows to be augmented. If the input is an
+            ndarray, it will be transformed to a list.
+            Dimension is (h, w, 2). Default: None.
+        return_status (bool): Return the status of flip and rotation.
+            Default: False.
+
+    Returns:
+        list[ndarray] | ndarray: Augmented images and flows. If returned
+            results only have one element, just return ndarray.
+
+    """
+    hflip = hflip and random.random() < 0.5
+    vflip = rotation and random.random() < 0.5
+    rot90 = rotation and random.random() < 0.5
+
+    def _augment(img):
+        if hflip:  # horizontal
+            img = torch.flip(img, [2])
+        if vflip:  # vertical
+            img = torch.flip(img, [1])
+            # cv2.flip(img, 0, img)
+        if rot90:
+            img = torch.rot90(img, 1, [1,2])
+            # img = img.transpose(1, 0, 2)
+        return img
+
+    if not isinstance(imgs, list):
+        imgs = [imgs]
+    imgs = [_augment(img) for img in imgs]
+    if len(imgs) == 1:
+        imgs = imgs[0]
+
+    if return_status:
+        return imgs, (hflip, vflip, rot90)
+    else:
+        return imgs
 
 def img_rotate(img, angle, center=None, scale=1.0):
     """Rotate image.

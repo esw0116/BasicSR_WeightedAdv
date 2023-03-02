@@ -139,6 +139,7 @@ def train_pipeline(root_path):
         save_filename = 'G.pth'
         filename_g = os.path.join(filename, save_filename)
         if hasattr(model, 'net_g_ema'):
+            print('Save ema generator model')
             network = model.get_bare_model(model.net_g_ema)
         else:
             network = model.get_bare_model(model.net_g)
@@ -245,7 +246,8 @@ def train_pipeline(root_path):
                     logger.warning('Multiple validation datasets are *only* supported by SRModel.')
                 for val_loader in val_loaders:
                     model.validation(val_loader, current_iter, tb_logger, opt['val']['save_img'])
-                nsml.report(step=current_iter, **model.metric_results)
+                if opt['dist'] == False or opt['rank'] == 0:
+                    nsml.report(step=current_iter, **model.metric_results)
             data_timer.start()
             iter_timer.start()
             train_data = prefetcher.next()

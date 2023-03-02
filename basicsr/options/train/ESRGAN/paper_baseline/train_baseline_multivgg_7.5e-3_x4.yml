@@ -50,10 +50,9 @@ network_g:
   num_block: 23
 
 network_d:
-  type: UNetDiscriminatorSN
+  type: VGGStyleDiscriminator128
   num_in_ch: 3
   num_feat: 64
-  skip_connection: True
 
 # path
 path:
