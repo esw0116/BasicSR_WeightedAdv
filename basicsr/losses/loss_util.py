@@ -1,6 +1,7 @@
 import functools
 import torch
 from torch.nn import functional as F
+from utils import resize
 
 
 def reduce_loss(loss, reduction):
@@ -143,3 +144,57 @@ def get_refined_artifact_map(img_gt, img_output, img_ema, ksize):
     overall_weight[residual_sr < residual_ema] = 0
 
     return overall_weight
+
+
+def backprojection(means, lr):
+    '''
+        sr: (B, M, C, H, W)
+        lr: (B, C, H, W)
+    '''
+    b, m, c, h, w = means.shape
+    means = means.view(b * m, c, h, w)
+    means = means.contiguous()
+    means_down = resize.imresize(
+        means,
+        sizes=(lr.shape[-2], lr.shape[-1]),
+        kernel='cubic',
+        antialiasing=True,
+    )
+    means_down = means_down.view(b, m, c, lr.shape[-2], lr.shape[-1])
+    return means_down
+    # lr_repeat = lr.unsqueeze(1).repeat(1, means_down.size(1), 1, 1, 1)
+    # loss = F.l1_loss(means_down, lr_repeat)
+    # return loss
+
+
+def min_ce_loss(gt, means, logits):
+    '''
+        gt: (B, C, H, W)
+        means: (B, M, C, H, W)
+    '''
+    if means.ndim == gt.ndim:
+        raise ValueError('output size should be different from gt size!')
+
+    # (B, 1, C, H, W)
+    gts = gt.unsqueeze(1)
+    # (B, M, C, H, W)
+    gts = gts.repeat(1, means.size(1), 1, 1, 1)
+
+    loss_raw = F.l1_loss(means, gts, reduction='none')
+
+    # Reduce across channel dimension
+    # (B, M, H, W)
+    loss_raw = loss_raw.mean(dim=2)
+    # (B, H, W)
+    loss_min, idx_min = loss_raw.min(1)
+    loss_min_avg = loss_min.mean()
+
+    logits = logits.squeeze(2)
+    # logits:   (B, M, H, W)
+    # idx_min:  (B, H, W)
+    loss_prob = F.cross_entropy(logits, idx_min)
+
+    w_min = 0.01
+    w_prob = 0.01
+    loss = w_min * loss_min_avg + w_prob * loss_prob
+    return loss

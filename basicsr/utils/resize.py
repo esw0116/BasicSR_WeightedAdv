@@ -2,7 +2,7 @@ import math
 import random
 import typing
 
-from utils import img_utils
+# from utils import img_utils
 
 import torch
 from torch.nn import functional as F
@@ -507,7 +507,7 @@ def build_blur_mask(
         dr: int=6,
         is_batched: bool=False) -> torch.Tensor:
 
-    h, w = img_utils.get_size(x)
+    h, w = x.shape[-2:] # img_utils.get_size(x)
     radius = p_rad * h
 
     py = h // 2 - random.randrange(-dp, dp)
@@ -552,7 +552,7 @@ def build_blur_mask_spot(
         dr: int=6,
         is_batched: bool=False) -> torch.Tensor:
 
-    h, w = img_utils.get_size(x)
+    h, w = x.shape[-2:] #img_utils.get_size(x)
     #radius = p_rad * h
     radius = 2
     dp = min(h // 3, w // 3)
