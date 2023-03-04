@@ -6,6 +6,7 @@ from collections import OrderedDict
 
 from archs import build_network
 from losses import build_loss
+from losses.loss_util import get_refined_artifact_map
 from utils import get_root_logger
 from utils.registry import MODEL_REGISTRY
 from .sr_model import SRModel
@@ -80,11 +81,6 @@ class SRGANModel(SRModel):
         else:
             self.cri_pix = None
 
-        if train_opt.get('artifacts_opt'):
-            self.cri_artifacts = build_loss(train_opt['artifacts_opt']).to(self.device)
-        else:
-            self.cri_artifacts = None
-
         if train_opt.get('ldl_opt'):
             self.cri_ldl = build_loss(train_opt['ldl_opt']).to(self.device)
         else:
@@ -123,15 +119,33 @@ class SRGANModel(SRModel):
 
         self.optimizer_g.zero_grad()
         self.output = self.net_g(self.lq)
+        if self.cri_ldl:
+            self.output_ema = self.net_g_ema(self.lq)
 
         l_g_total = 0
         loss_dict = OrderedDict()
+        if hasattr(self, 'coeff'):
+            convert_y = torch.Tensor([65.481/255, 128.553/255, 24.966/255]).reshape(3,1,1).to(self.device)
+            self.pos_weight = torch.sum(self.coeff * convert_y, dim=1, keepdims=True) + 16/255
+
+            weight_policy = self.opt['train']['weightpolicy'] if 'weightpolicy' in self.opt['train'] else None
+            if weight_policy == 'clamp':
+                self.pos_weight = self.pos_weight.clamp(0, 1)
+            loss_dict['weight_average'] = self.pos_weight.mean()
+        else:
+            self.pos_weight = None
+
         if (current_iter % self.net_d_iters == 0 and current_iter > self.net_d_init_iters):
             # pixel loss
             if self.cri_pix:
                 l_g_pix = self.cri_pix(self.output, self.gt)
                 l_g_total += l_g_pix
                 loss_dict['l_g_pix'] = l_g_pix
+            if self.cri_ldl:
+                pixel_weight = get_refined_artifact_map(self.gt, self.output, self.output_ema, 7)
+                l_g_ldl = self.cri_ldl(torch.mul(pixel_weight, self.output), torch.mul(pixel_weight, self.gt))
+                l_g_total += l_g_ldl
+                loss_dict['l_g_ldl'] = l_g_ldl
             # perceptual loss
             if self.cri_perceptual:
                 l_g_percep, l_g_style = self.cri_perceptual(self.output, self.gt)
@@ -143,7 +157,7 @@ class SRGANModel(SRModel):
                     loss_dict['l_g_style'] = l_g_style
             # gan loss
             fake_g_pred = self.net_d(self.output)
-            l_g_gan = self.cri_gan(fake_g_pred, True, is_disc=False)
+            l_g_gan = self.cri_gan(fake_g_pred, True, is_disc=False, pos_weight=self.pos_weight)
             l_g_total += l_g_gan
             loss_dict['l_g_gan'] = l_g_gan
 

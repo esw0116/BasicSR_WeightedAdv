@@ -1,6 +1,6 @@
 # general settings
-name: 052_SRGAN_x4_f64b23_DIV2K_400k_B16G1_Baseline_UnetDisc
-model_type: SRGANModel
+name: 052_ESRGAN_x4_f64b23_DIV2K_400k_B16G1_Weighted_UnetDisc
+model_type: ESRGANICCVModel
 scale: 4
 num_gpu: 1  # set num_gpu: 0 for cpu mode
 manual_seed: 0
@@ -9,13 +9,12 @@ manual_seed: 0
 datasets:
   train:
     name: DIV2K
-    type: PairedImageDataset
-    dataroot_gt: train/DIV2K/DIV2K_train_HR
-    dataroot_lq: train/DIV2K/DIV2K_train_LR_bicubic/X4
-    # (for lmdb)
-    # dataroot_gt: datasets/DIV2K/DIV2K_train_HR_sub.lmdb
-    # dataroot_lq: datasets/DIV2K/DIV2K_train_LR_bicubic_X4_sub.lmdb
+    type: PyWeightPairedImageDataset
+    dataroot_gt: train/DIV2K/bin/DIV2K_train_HR
+    dataroot_lq: train/DIV2K/bin/DIV2K_train_LR_bicubic/X4
+    dataroot_weight: train/DIV2K/DIV2K_train_weight_RRDB/weight_nonsym
     filename_tmpl: '{}x4'
+    filename_tmpl_weight: '{}_weight_comp'
     io_backend:
       type: disk
       # (for lmdb)
@@ -43,12 +42,12 @@ datasets:
 
 # network structures
 network_g:
-  type: MSRResNet
+  type: RRDBNet
   num_in_ch: 3
   num_out_ch: 3
   num_feat: 64
-  num_block: 16
-  upscale: 4
+  num_block: 23
+  num_grow_ch: 32
 
 network_d:
   type: VGGStyleDiscriminator128
@@ -57,7 +56,7 @@ network_d:
 
 # path
 path:
-  pretrain_network_g: train/pretrained_models/MSRResnet_g_x4.pth
+  pretrain_network_g: train/pretrained_models/ESRGAN_PSNR_SRx4_DF2K_official.pth
   strict_load_g: true
   resume_state: ~
 
@@ -66,12 +65,12 @@ train:
   ema_decay: 0.999
   optim_g:
     type: Adam
-    lr: !!float 1e-4
+    lr: !!float 2e-4
     weight_decay: 0
     betas: [0.9, 0.99]
   optim_d:
     type: Adam
-    lr: !!float 1e-4
+    lr: !!float 2e-4
     weight_decay: 0
     betas: [0.9, 0.99]
 
@@ -82,6 +81,8 @@ train:
 
   total_iter: 300000
   warmup_iter: -1  # no warm up
+
+  weightpolicy: ~
 
   # losses
   pixel_opt:
@@ -107,7 +108,7 @@ train:
     gan_type: vanilla
     real_label_val: 1.0
     fake_label_val: 0.0
-    loss_weight: !!float 1e-2
+    loss_weight: !!float 5e-2
 
   net_d_iters: 1
   net_d_init_iters: 0
@@ -134,7 +135,7 @@ val:
 # logging settings
 logger:
   print_freq: 2500
-  save_checkpoint_freq: !!float 2e4
+  save_checkpoint_freq: !!float 1e4
   use_tb_logger: false
   wandb:
     project: ~
@@ -144,7 +145,3 @@ logger:
 dist_params:
   backend: nccl
   port: 29500
-
-
-# NSML code
-#  nsml run --esm A014429  -d CVLAB_SR5 -g 1  -c 8 --shm-size "4G" -e basicsr/train.py -a "--opt options/train/Weight_ESRGAN/train_baseline_1e-2_x4.yml"

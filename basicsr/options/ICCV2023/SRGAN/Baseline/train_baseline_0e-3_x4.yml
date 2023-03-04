@@ -26,16 +26,16 @@ datasets:
     use_rot: true
 
     # data loader
-    num_worker_per_gpu: 6
-    batch_size_per_gpu: 16
+    num_worker_per_gpu: 8
+    batch_size_per_gpu: 32
     dataset_enlarge_ratio: 100
     prefetch_mode: ~
 
   val:
-    name: Set14
+    name: B100
     type: PairedImageDataset
-    dataroot_gt: train/benchmark/Set14/HR
-    dataroot_lq: train/benchmark/Set14/LR_bicubic/X4
+    dataroot_gt: train/benchmark/BSD100/HR
+    dataroot_lq: train/benchmark/BSD100/LR_bicubic/X4
     filename_tmpl: '{}x4'
     dataroot_weight: 
     io_backend:
@@ -80,7 +80,7 @@ train:
     milestones: [300000]
     gamma: 1
 
-  total_iter: 200000
+  total_iter: 300000
   warmup_iter: -1  # no warm up
 
   # losses
@@ -107,7 +107,7 @@ train:
     gan_type: vanilla
     real_label_val: 1.0
     fake_label_val: 0.0
-    loss_weight: !!float 5e-3
+    loss_weight: !!float 0e-3
 
   net_d_iters: 1
   net_d_init_iters: 0

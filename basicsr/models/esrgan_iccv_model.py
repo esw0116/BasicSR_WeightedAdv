@@ -21,6 +21,8 @@ class ESRGANICCVModel(SRGANICCVModel):
         if self.cri_ldl:
             self.output_ema = self.net_g_ema(self.lq)
         
+        l_g_total = 0
+        loss_dict = OrderedDict()
         if hasattr(self, 'coeff'):
             convert_y = torch.Tensor([65.481/255, 128.553/255, 24.966/255]).reshape(3,1,1).to(self.device)
             self.pos_weight = torch.sum(self.coeff * convert_y, dim=1, keepdims=True) + 16/255
@@ -28,11 +30,10 @@ class ESRGANICCVModel(SRGANICCVModel):
             weight_policy = self.opt['train']['weightpolicy'] if 'weightpolicy' in self.opt['train'] else None
             if weight_policy == 'clamp':
                 self.pos_weight = self.pos_weight.clamp(0, 1)
+            loss_dict['weight_average'] = self.pos_weight.mean()
         else:
             self.pos_weight = None
 
-        l_g_total = 0
-        loss_dict = OrderedDict()
         if (current_iter % self.net_d_iters == 0 and current_iter > self.net_d_init_iters):
             # pixel loss
             if self.cri_pix:
