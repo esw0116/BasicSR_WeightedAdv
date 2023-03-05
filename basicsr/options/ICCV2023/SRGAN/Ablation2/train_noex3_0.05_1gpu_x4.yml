@@ -12,7 +12,7 @@ datasets:
     type: PyWeightPairedImageDataset
     dataroot_gt: train/DIV2K/bin/DIV2K_train_HR
     dataroot_lq: train/DIV2K/bin/DIV2K_train_LR_bicubic/X4
-    dataroot_weight: train/DIV2K/DIV2K_train_weight_RRDB/weight_nonsym
+    dataroot_weight: train/DIV2K/srresnet_m3_noex_nomax_avg/weight_comp
     filename_tmpl: '{}x4'
     filename_tmpl_weight: '{}_weight_comp'
     io_backend:

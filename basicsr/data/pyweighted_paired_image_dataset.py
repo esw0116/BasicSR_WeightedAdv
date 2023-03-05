@@ -96,7 +96,7 @@ class PyWeightPairedImageDataset(data.Dataset):
 
         weight_path = self.paths[index]['weight_path']
         img_coeff = torch.load(weight_path)[0]
-        if 'weight' in self.filename_tmpl_weight:
+        if img_coeff.min() < 0:
             img_coeff = img_coeff + 1 # Add 1 for non-negative weight
 
         # augmentation for training
