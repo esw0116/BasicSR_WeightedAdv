@@ -9,16 +9,14 @@ manual_seed: 0
 datasets:
   train:
     name: DIV2K
-    type: PyWeightPairedImageDataset
+    type: PyUDLWeightPairedImageDataset
     dataroot_gt: train/DIV2K/bin/DIV2K_train_HR
     dataroot_lq: train/DIV2K/bin/DIV2K_train_LR_bicubic/X4
-    dataroot_weight: train/DIV2K/srresnet_m2_noex_nomax_avg/weight_comp
+    dataroot_weight: train/DIV2K/udl_uncertainty
     filename_tmpl: '{}x4'
-    filename_tmpl_weight: '{}_weight_comp'
+    filename_tmpl_weight: '{}_uncertainty'
     io_backend:
       type: disk
-      # (for lmdb)
-      # type: lmdb
 
     gt_size: 128
     use_hflip: true
@@ -108,7 +106,7 @@ train:
     gan_type: vanilla
     real_label_val: 1.0
     fake_label_val: 0.0
-    loss_weight: !!float 1e-2
+    loss_weight: !!float 5e-2
 
   net_d_iters: 1
   net_d_init_iters: 0

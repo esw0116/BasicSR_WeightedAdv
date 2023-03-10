@@ -108,7 +108,7 @@ train:
     gan_type: vanilla
     real_label_val: 1.0
     fake_label_val: 0.0
-    loss_weight: !!float 1e-2
+    loss_weight: !!float 2e-2
 
   net_d_iters: 1
   net_d_init_iters: 0
@@ -135,7 +135,7 @@ val:
 # logging settings
 logger:
   print_freq: 2500
-  save_checkpoint_freq: !!float 1e4
+  save_checkpoint_freq: !!float 5e3
   use_tb_logger: false
   wandb:
     project: ~

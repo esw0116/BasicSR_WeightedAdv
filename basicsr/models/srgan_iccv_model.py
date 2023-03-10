@@ -126,9 +126,12 @@ class SRGANICCVModel(SRModel):
         l_g_total = 0
         loss_dict = OrderedDict()
         if hasattr(self, 'coeff'):
-            convert_y = torch.Tensor([65.481/255, 128.553/255, 24.966/255]).reshape(3,1,1).to(self.device)
-            self.pos_weight = torch.sum(self.coeff * convert_y, dim=1, keepdims=True) + 16/255
-
+            if self.coeff.shape[1] == 3:
+                convert_y = torch.Tensor([65.481/255, 128.553/255, 24.966/255]).reshape(3,1,1).to(self.device)
+                self.pos_weight = torch.sum(self.coeff * convert_y, dim=1, keepdims=True) + 16/255
+            else:
+                self.pos_weight = self.coeff
+                
             weight_policy = self.opt['train']['weightpolicy'] if 'weightpolicy' in self.opt['train'] else None
             if weight_policy == 'clamp':
                 self.pos_weight = self.pos_weight.clamp(0, 1)
