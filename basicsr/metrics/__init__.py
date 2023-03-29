@@ -3,8 +3,9 @@ from copy import deepcopy
 from utils.registry import METRIC_REGISTRY
 from .niqe import calculate_niqe
 from .psnr_ssim import calculate_psnr, calculate_ssim
+from .cal_lpips import calculate_lpips
 
-__all__ = ['calculate_psnr', 'calculate_ssim', 'calculate_niqe']
+__all__ = ['calculate_psnr', 'calculate_ssim', 'calculate_niqe', 'calculate_lpips']
 
 
 def calculate_metric(data, opt):
