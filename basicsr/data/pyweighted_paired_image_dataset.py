@@ -46,8 +46,7 @@ class PyWeightPairedImageDataset(data.Dataset):
         self.io_backend_opt = opt['io_backend']
         self.mean = opt['mean'] if 'mean' in opt else None
         self.std = opt['std'] if 'std' in opt else None
-        self.normalize_map = opt['normalize'] if 'normalize' in opt else False
-        
+
         if True:
             from nsml import DATASET_PATH
             self.gt_folder, self.lq_folder, self.weight_folder = os.path.join(DATASET_PATH, opt['dataroot_gt']), os.path.join(DATASET_PATH, opt['dataroot_lq']), os.path.join(DATASET_PATH, opt['dataroot_weight'])

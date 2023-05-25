@@ -24,8 +24,18 @@ class ESRGANICCVModel(SRGANICCVModel):
         l_g_total = 0
         loss_dict = OrderedDict()
         if hasattr(self, 'coeff'):
-            convert_y = torch.Tensor([65.481/255, 128.553/255, 24.966/255]).reshape(3,1,1).to(self.device)
-            self.pos_weight = torch.sum(self.coeff * convert_y, dim=1, keepdims=True) + 16/255
+            no_dc = self.opt['train']['no_dc'] if 'no_dc' in self.opt['train'] else False
+            if self.coeff.shape[1] == 3:
+                convert_y = torch.Tensor([65.481/255, 128.553/255, 24.966/255]).reshape(3,1,1).to(self.device)
+                if no_dc:
+                    self.pos_weight = torch.sum(self.coeff * convert_y, dim=1, keepdims=True)
+                else:
+                    self.pos_weight = torch.sum(self.coeff * convert_y, dim=1, keepdims=True) + 16/255
+            elif self.coeff.shape[1] == 1:
+                if no_dc:
+                    self.pos_weight = self.coeff - 16/255
+                else:
+                    self.pos_weight = self.coeff
 
             weight_policy = self.opt['train']['weightpolicy'] if 'weightpolicy' in self.opt['train'] else None
             if weight_policy == 'clamp':
@@ -85,16 +95,21 @@ class ESRGANICCVModel(SRGANICCVModel):
         # an inplace operation",
         # we separate the backwards for real and fake, and also detach the
         # tensor for calculating mean.
+        attenuate_d = self.opt['train']['attn_d'] if 'attn_d' in self.opt['train'] else False
+        if attenuate_d:
+            attn_d = self.pos_weight.mean()
+        else:
+            attn_d = 1
 
         # real
         fake_d_pred = self.net_d(self.output).detach()
         real_d_pred = self.net_d(self.gt)
-        l_d_real = self.cri_gan(real_d_pred - torch.mean(fake_d_pred), True, is_disc=True) * 0.5
+        l_d_real = attn_d * self.cri_gan(real_d_pred - torch.mean(fake_d_pred), True, is_disc=True) * 0.5
         l_d_real.backward()
         
         # fake
         fake_d_pred = self.net_d(self.output.detach())
-        l_d_fake = self.cri_gan(fake_d_pred - torch.mean(real_d_pred.detach()), False, is_disc=True) * 0.5
+        l_d_fake = attn_d * self.cri_gan(fake_d_pred - torch.mean(real_d_pred.detach()), False, is_disc=True) * 0.5
         l_d_fake.backward()
         self.optimizer_d.step()
 

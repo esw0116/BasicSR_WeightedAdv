@@ -83,6 +83,7 @@ train:
   warmup_iter: -1  # no warm up
 
   weightpolicy: ~
+  attn_d: true
 
   # losses
   pixel_opt:
