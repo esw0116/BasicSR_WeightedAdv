@@ -1,28 +1,32 @@
 # general settings
-name: train_SwinIR_SRx4_scratch_P48W8_DIV2K_500k_B4G8
-model_type: SwinIRModel
+name: SRGAN_x4_f64b23_DIV2K_400k_B16G1
+model_type: ESRGANICCVModel
 scale: 4
-num_gpu: 4
+num_gpu: 4  # set num_gpu: 0 for cpu mode
 manual_seed: 0
 
 # dataset and data loader settings
 datasets:
   train:
-    name: DIV2K
-    type: PyPairedImageDataset
-    dataroot_gt: train/DIV2K/bin/DIV2K_train_HR
-    dataroot_lq: train/DIV2K/bin/DIV2K_train_LR_bicubic/X4
+    name: DF2K
+    type: HybridWeightPairedImageDataset
+    dataroot_gt: train/DIV2K/DIV2K_train_HR+train/Flickr2K/Flickr2K
+    dataroot_lq: train/DIV2K/DIV2K_train_LR_bicubic/X4+train/Flickr2K/Flickr2K_LR_bicubic/X4
+    dataroot_weight: train/srresnet_m2_noex_nomax_avg_div2k/weight_div2k+train/srresnet_m2_noex_nomax_avg_fl2k/weight_flickr
     filename_tmpl: '{}x4'
+    filename_tmpl_weight: '{}_weight_comp'
     io_backend:
       type: disk
+      # (for lmdb)
+      # type: lmdb
 
     gt_size: 192
     use_hflip: true
     use_rot: true
 
     # data loader
-    num_worker_per_gpu: 6
-    batch_size_per_gpu: 8
+    num_worker_per_gpu: 8
+    batch_size_per_gpu: 16
     dataset_enlarge_ratio: 100
     prefetch_mode: ~
 
@@ -67,27 +71,29 @@ train:
   ema_decay: 0.999
   optim_g:
     type: Adam
-    lr: !!float 1e-4
+    lr: !!float 2e-4
     weight_decay: 0
     betas: [0.9, 0.99]
   optim_d:
     type: Adam
-    lr: !!float 1e-4
+    lr: !!float 2e-4
     weight_decay: 0
     betas: [0.9, 0.99]
-  
+
   scheduler:
     type: MultiStepLR
-    milestones: [250000, 400000, 450000, 475000]
-    gamma: 0.5
+    milestones: [300000]
+    gamma: 1
 
-  total_iter: 500000
+  total_iter: 300000
   warmup_iter: -1  # no warm up
+
+  weightpolicy: ~
 
   # losses
   pixel_opt:
     type: L1Loss
-    loss_weight: 1.0
+    loss_weight: !!float 1e-2
     reduction: mean
   perceptual_opt:
     type: PerceptualLoss
@@ -108,18 +114,21 @@ train:
     gan_type: vanilla
     real_label_val: 1.0
     fake_label_val: 0.0
-    loss_weight: !!float 5e-3
+    loss_weight: !!float 5e-2
+
+  net_d_iters: 1
+  net_d_init_iters: 0
 
 # validation settings
 val:
-  val_freq: !!float 2.5e3
+  val_freq: !!float 5e3
   save_img: false
 
   metrics:
     psnr: # metric name, can be arbitrary
       type: calculate_psnr
       crop_border: 4
-      test_y_channel: false
+      test_y_channel: true
     ssim:
       type: calculate_ssim
       crop_border: 4
@@ -131,7 +140,7 @@ val:
 
 # logging settings
 logger:
-  print_freq: 1000
+  print_freq: 2500
   save_checkpoint_freq: !!float 1e4
   use_tb_logger: false
   wandb:

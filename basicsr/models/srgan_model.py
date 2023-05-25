@@ -124,16 +124,6 @@ class SRGANModel(SRModel):
 
         l_g_total = 0
         loss_dict = OrderedDict()
-        if hasattr(self, 'coeff'):
-            convert_y = torch.Tensor([65.481/255, 128.553/255, 24.966/255]).reshape(3,1,1).to(self.device)
-            self.pos_weight = torch.sum(self.coeff * convert_y, dim=1, keepdims=True) + 16/255
-
-            weight_policy = self.opt['train']['weightpolicy'] if 'weightpolicy' in self.opt['train'] else None
-            if weight_policy == 'clamp':
-                self.pos_weight = self.pos_weight.clamp(0, 1)
-            loss_dict['weight_average'] = self.pos_weight.mean()
-        else:
-            self.pos_weight = None
 
         if (current_iter % self.net_d_iters == 0 and current_iter > self.net_d_init_iters):
             # pixel loss
@@ -157,7 +147,7 @@ class SRGANModel(SRModel):
                     loss_dict['l_g_style'] = l_g_style
             # gan loss
             fake_g_pred = self.net_d(self.output)
-            l_g_gan = self.cri_gan(fake_g_pred, True, is_disc=False, pos_weight=self.pos_weight)
+            l_g_gan = self.cri_gan(fake_g_pred, True, is_disc=False)
             l_g_total += l_g_gan
             loss_dict['l_g_gan'] = l_g_gan
 
