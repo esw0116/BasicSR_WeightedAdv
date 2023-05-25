@@ -5,6 +5,7 @@ thop
 addict
 future
 lmdb
+lpips
 numpy>=1.17
 Pillow
 PyWavelets

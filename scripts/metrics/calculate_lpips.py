@@ -22,7 +22,7 @@ def main():
     # crop_border = 4
     suffix = ''
     # -------------------------------------------------------------------------
-    loss_fn_vgg = lpips.LPIPS(net='vgg').cuda()  # RGB, normalized to [-1,1]
+    loss_fn_vgg = lpips.LPIPS(net='alex').cuda()  # RGB, normalized to [-1,1]
     lpips_all = []
     img_gt_list = sorted(glob.glob(osp.join(folder_gt, '*')))
     img_sr_list = sorted(glob.glob(osp.join(folder_restored, '*')))
