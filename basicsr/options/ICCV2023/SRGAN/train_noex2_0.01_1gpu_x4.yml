@@ -108,7 +108,7 @@ train:
     gan_type: vanilla
     real_label_val: 1.0
     fake_label_val: 0.0
-    loss_weight: !!float 2.5e-2
+    loss_weight: !!float 1e-2
 
   net_d_iters: 1
   net_d_init_iters: 0

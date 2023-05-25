@@ -127,6 +127,16 @@ class SRGANPAWModel(SRModel):
         self.optimizer_d = self.get_optimizer(optim_type, self.net_d.parameters(), **train_opt['optim_d'])
         self.optimizers.append(self.optimizer_d)
 
+    def test(self):
+        if hasattr(self, 'net_g_ema'):
+            self.net_g_ema.eval()
+            with torch.no_grad():
+                self.output, _, _ = self.net_g_ema(self.lq)
+        else:
+            self.net_g.eval()
+            with torch.no_grad():
+                self.output, _, _ = self.net_g(self.lq)
+            self.net_g.train()
     def optimize_parameters(self, current_iter):
         # optimize net_g
         for p in self.net_d.parameters():
